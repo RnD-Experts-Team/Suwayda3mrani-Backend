@@ -14,6 +14,8 @@ class LocalizationController extends Controller
 {
     public function index(Request $request)
     {
+
+        
         $query = Localization::query();
 
         // Filter by language
@@ -21,9 +23,22 @@ class LocalizationController extends Controller
             $query->byLanguage($request->language);
         }
 
-        // Filter by group
+        // Filter by group - FIXED to handle null values properly
         if ($request->filled('group')) {
-            $query->byGroup($request->group);
+            if ($request->group === 'null') {
+                $query->whereNull('group');
+            } else {
+                $query->byGroup($request->group);
+            }
+        }
+
+        // Filter by status - ADDED
+        if ($request->filled('status')) {
+            if ($request->status === 'active') {
+                $query->where('is_active', true);
+            } elseif ($request->status === 'inactive') {
+                $query->where('is_active', false);
+            }
         }
 
         // Search functionality
@@ -38,7 +53,7 @@ class LocalizationController extends Controller
         $localizations = $query->orderBy('language')
             ->orderBy('group')
             ->orderBy('key')
-            ->paginate(50)
+            ->paginate(10)
             ->withQueryString();
 
         $languages = Localization::distinct()->pluck('language')->sort()->values();
@@ -48,7 +63,7 @@ class LocalizationController extends Controller
             'localizations' => $localizations,
             'languages' => $languages,
             'groups' => $groups,
-            'filters' => $request->only(['language', 'group', 'search']),
+            'filters' => $request->only(['language', 'group', 'search', 'status']), // ADDED status
         ]);
     }
 
@@ -106,11 +121,17 @@ class LocalizationController extends Controller
             ->with('success', 'Localization deleted successfully.');
     }
 
-    // API endpoint for frontend translations
-    public function getTranslations(Request $request, string $language)
+    // ADDED - Bulk delete functionality
+    public function bulkDelete(Request $request)
     {
-        $translations = Localization::getTranslations($language);
-        
-        return response()->json($translations);
+        $request->validate([
+            'ids' => 'required|array',
+            'ids.*' => 'exists:localizations,id'
+        ]);
+
+        Localization::whereIn('id', $request->ids)->delete();
+
+        return redirect()->route('localizations.index')
+            ->with('success', count($request->ids) . ' localizations deleted successfully.');
     }
 }

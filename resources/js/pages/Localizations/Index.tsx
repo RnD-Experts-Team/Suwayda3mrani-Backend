@@ -135,16 +135,26 @@ export default function LocalizationsIndex(props: Props) {
     const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
     const [itemToDelete, setItemToDelete] = useState<number | null>(null);
 
-    // Handle filter changes with debounce for search
+    // Add a flag to track if we should trigger filter on search change
+    const [isInitialLoad, setIsInitialLoad] = useState(true);
+
+    // Handle filter changes with debounce for search - FIXED
     useEffect(() => {
+        // Don't trigger on initial load to prevent pagination reset
+        if (isInitialLoad) {
+            setIsInitialLoad(false);
+            return;
+        }
+
         const timeoutId = setTimeout(() => {
-            handleFilter();
+            applyFilters();
         }, 300);
 
         return () => clearTimeout(timeoutId);
     }, [searchTerm]);
 
-    const handleFilter = () => {
+    // FIXED: Single filter application function that uses current state
+    const applyFilters = () => {
         const params: Record<string, string> = {};
         
         if (searchTerm?.trim()) params.search = searchTerm.trim();
@@ -157,6 +167,41 @@ export default function LocalizationsIndex(props: Props) {
         
         const statusFilter = getFilterValue(selectedStatus);
         if (statusFilter) params.status = statusFilter;
+
+        console.log('Applying filters with params:', params);
+
+        router.get('/localizations', Object.keys(params).length > 0 ? params : {}, {
+            preserveState: true,
+            preserveScroll: true,
+        });
+    };
+
+    // FIXED: Function that applies filters with specific values (not dependent on state)
+    const applyFiltersWithValues = (overrides: {
+        language?: string;
+        group?: string;
+        status?: string;
+        search?: string;
+    } = {}) => {
+        const params: Record<string, string> = {};
+        
+        const searchValue = overrides.search !== undefined ? overrides.search : searchTerm;
+        const languageValue = overrides.language !== undefined ? overrides.language : selectedLanguage;
+        const groupValue = overrides.group !== undefined ? overrides.group : selectedGroup;
+        const statusValue = overrides.status !== undefined ? overrides.status : selectedStatus;
+        
+        if (searchValue?.trim()) params.search = searchValue.trim();
+        
+        const languageFilter = getFilterValue(languageValue);
+        if (languageFilter) params.language = languageFilter;
+        
+        const groupFilter = getFilterValue(groupValue);
+        if (groupFilter) params.group = groupFilter;
+        
+        const statusFilter = getFilterValue(statusValue);
+        if (statusFilter) params.status = statusFilter;
+
+        console.log('Applying filters with values:', params, 'overrides:', overrides);
 
         router.get('/localizations', Object.keys(params).length > 0 ? params : {}, {
             preserveState: true,
@@ -354,10 +399,11 @@ export default function LocalizationsIndex(props: Props) {
                                 />
                             </div>
                             
-                            {/* Language Select */}
+                            {/* Language Select - FIXED */}
                             <Select value={selectedLanguage} onValueChange={(value) => {
                                 setSelectedLanguage(value);
-                                setTimeout(handleFilter, 0);
+                                // Apply filters immediately with the new value
+                                applyFiltersWithValues({ language: value });
                             }}>
                                 <SelectTrigger>
                                     <SelectValue placeholder="All Languages" />
@@ -372,10 +418,11 @@ export default function LocalizationsIndex(props: Props) {
                                 </SelectContent>
                             </Select>
 
-                            {/* Group Select */}
+                            {/* Group Select - FIXED */}
                             <Select value={selectedGroup} onValueChange={(value) => {
                                 setSelectedGroup(value);
-                                setTimeout(handleFilter, 0);
+                                // Apply filters immediately with the new value
+                                applyFiltersWithValues({ group: value });
                             }}>
                                 <SelectTrigger>
                                     <SelectValue placeholder="All Groups" />
@@ -391,10 +438,11 @@ export default function LocalizationsIndex(props: Props) {
                                 </SelectContent>
                             </Select>
 
-                            {/* Status Select */}
+                            {/* Status Select - FIXED */}
                             <Select value={selectedStatus} onValueChange={(value) => {
                                 setSelectedStatus(value);
-                                setTimeout(handleFilter, 0);
+                                // Apply filters immediately with the new value
+                                applyFiltersWithValues({ status: value });
                             }}>
                                 <SelectTrigger>
                                     <SelectValue placeholder="All Status" />

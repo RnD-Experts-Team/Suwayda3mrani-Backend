@@ -32,12 +32,12 @@ class Localization extends Model
     }
 
     public function scopeByGroup(Builder $query, ?string $group): Builder
-    {
-        if ($group === 'null') {
-            return $query->whereNull('group');
-        }
-        return $query->where('group', $group);
+{
+    if ($group === null || $group === 'null') {
+        return $query->whereNull('group');
     }
+    return $query->where('group', $group);
+}
 
     // Helper methods
     public static function getTranslations(string $language): array
