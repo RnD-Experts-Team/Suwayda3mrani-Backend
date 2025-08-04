@@ -82,35 +82,53 @@ class FrontEndController extends Controller
     }
 
     // ===================================
-    // HOME PAGE (OPTIMIZED)
-    // ===================================
-    
-    public function homeFront()
-    {
-        return Cache::remember('home_frontend_data_v3', self::CACHE_DURATION['medium'], function () {
+// HOME PAGE (OPTIMIZED)
+// ===================================
+public function homeFront()
+{
+    return Cache::remember(
+        'home_frontend_data_v3',
+        self::CACHE_DURATION['medium'],
+        function () {
+
             $homeData = [];
 
-            // ✅ Single query for home sections
-            $homeSections = HomeSection::select(['id', 'type', 'sort_order', 'title_key', 'description_key', 'background_image_path'])
+            // FIX: drop the non-existent column
+            $homeSections = HomeSection::select([
+                    'id',
+                    'type',
+                    'sort_order',
+                    'title_key',
+                    'description_key'
+                    // 'background_image_path',   <-- removed
+                    // or use the real one:
+                    // 'background_image',
+                ])
                 ->where('is_active', true)
                 ->orderBy('sort_order')
                 ->get()
                 ->keyBy('type');
 
-            // ✅ Optimized section building with early returns
             $this->buildHeroSection($homeSections, $homeData);
             $this->buildFeaturedMediaSection($homeData);
             $this->buildFeaturedOrganizationsSection($homeData);
             $this->buildFeaturedTestimoniesSection($homeData);
             $this->buildDynamicSections($homeSections, $homeData);
 
-            // ✅ Single sort operation
-            usort($homeData, fn($a, $b) => ($a['sort_order'] ?? 999) <=> ($b['sort_order'] ?? 999));
+            usort(
+                $homeData,
+                fn ($a, $b) => ($a['sort_order'] ?? 999) <=> ($b['sort_order'] ?? 999)
+            );
 
-            // ✅ Remove sort_order in one pass
-            return response()->json(array_map(fn($item) => array_diff_key($item, ['sort_order' => null]), $homeData));
-        });
-    }
+            return response()->json(
+                array_map(
+                    fn ($item) => array_diff_key($item, ['sort_order' => null]),
+                    $homeData
+                )
+            );
+        }
+    );
+}
 
     /**
      * ✅ Optimized hero section builder
@@ -316,85 +334,85 @@ class FrontEndController extends Controller
      * Ultra-optimized media gallery with advanced caching and database optimization
      */
     public function getMediaItems(Request $request)
-    {
-        // ✅ Minimal validation with custom rules
-        $validated = $request->validate([
-            'page' => 'integer|min:1|max:1000', // Prevent abuse
-            'limit' => 'integer|min:1|max:24',   // Reasonable max
-            'type' => 'in:image,video,all'
-        ]);
+{
+    // ✅ Minimal validation with custom rules
+    $validated = $request->validate([
+        'page' => 'integer|min:1|max:1000', // Prevent abuse
+        'limit' => 'integer|min:1|max:24',   // Reasonable max
+        'type' => 'in:image,video,all'
+    ]);
 
-        $page = $validated['page'] ?? 1;
-        $limit = min($validated['limit'] ?? self::PAGINATION_LIMITS['gallery'], 24);
-        $type = $validated['type'] ?? 'all';
-        $offset = ($page - 1) * $limit;
+    $page = $validated['page'] ?? 1;
+    $limit = min($validated['limit'] ?? self::PAGINATION_LIMITS['gallery'], 24);
+    $type = $validated['type'] ?? 'all';
+    $offset = ($page - 1) * $limit;
 
-        // ✅ Multi-layer cache strategy
-        $mainCacheKey = "media_gallery_v2_{$type}_{$page}_{$limit}";
-        $countCacheKey = "media_gallery_count_v2_{$type}";
+    // ✅ Multi-layer cache strategy
+    $mainCacheKey = "media_gallery_v2_{$type}_{$page}_{$limit}";
+    $countCacheKey = "media_gallery_count_v2_{$type}";
+    
+    return Cache::remember($mainCacheKey, self::CACHE_DURATION['short'], function () use ($offset, $limit, $type, $countCacheKey, $page) {
         
-        return Cache::remember($mainCacheKey, self::CACHE_DURATION['short'], function () use ($offset, $limit, $type, $countCacheKey) {
+        // ✅ Get total count from separate cache to avoid expensive COUNT queries
+        $totalItems = Cache::remember($countCacheKey, self::CACHE_DURATION['medium'], function () use ($type) {
+            $query = Media::where('is_active', true)->where('featured_on_home', true);
             
-            // ✅ Get total count from separate cache to avoid expensive COUNT queries
-            $totalItems = Cache::remember($countCacheKey, self::CACHE_DURATION['medium'], function () use ($type) {
-                $query = Media::where('is_active', true)->where('featured_on_home', true);
-                
-                if ($type !== 'all') {
-                    $query->where('type', $type);
-                }
-                
-                return $query->count();
-            });
-
-            // ✅ Early return if no items
-            if ($totalItems === 0) {
-                return $this->buildEmptyGalleryResponse($totalItems, $limit, 1);
-            }
-
-            // ✅ Optimized query with only necessary columns and proper indexing
-            $query = Media::select([
-                'id', 'media_id', 'type', 'source_type', 'file_path', 
-                'google_drive_id', 'external_url', 'thumbnail_path', 
-                'title_key', 'description_key', 'source_url', 'created_at'
-            ])
-            ->where('is_active', true)
-            ->where('featured_on_home', true);
-
             if ($type !== 'all') {
                 $query->where('type', $type);
             }
-
-            // ✅ Optimized ordering and pagination
-            $items = $query->orderByDesc('created_at')
-                          ->offset($offset)
-                          ->limit($limit)
-                          ->get();
-
-            // ✅ Bulk load all translations in one query to avoid N+1
-            $titleKeys = $items->pluck('title_key')->filter();
-            $descriptionKeys = $items->pluck('description_key')->filter();
-            $allKeys = $titleKeys->merge($descriptionKeys)->unique();
-
-            $translations = [];
-            if ($allKeys->isNotEmpty()) {
-                $translations = Localization::whereIn('key', $allKeys)
-                    ->whereIn('language', ['en', 'ar'])
-                    ->where('is_active', true)
-                    ->get()
-                    ->groupBy('key')
-                    ->map(function ($keyTranslations) {
-                        return $keyTranslations->pluck('value', 'language')->toArray();
-                    });
-            }
-
-            // ✅ Transform with pre-loaded translations
-            $mediaItems = $items->map(function ($item) use ($translations) {
-                return $this->transformMediaItemForGallery($item, $translations);
-            });
-
-            return $this->buildGalleryResponse($mediaItems, $totalItems, $page, $limit, $offset);
+            
+            return $query->count();
         });
-    }
+
+        // ✅ Early return if no items - NOW WITH CORRECT VARIABLES
+        if ($totalItems === 0) {
+            return $this->buildEmptyGalleryResponse($totalItems, $limit, $page);
+        }
+
+        // ✅ Optimized query with only necessary columns and proper indexing
+        $query = Media::select([
+            'id', 'media_id', 'type', 'source_type', 'file_path', 
+            'google_drive_id', 'external_url', 'thumbnail_path', 
+            'title_key', 'description_key', 'source_url', 'created_at'
+        ])
+        ->where('is_active', true)
+        ->where('featured_on_home', true);
+
+        if ($type !== 'all') {
+            $query->where('type', $type);
+        }
+
+        // ✅ Optimized ordering and pagination
+        $items = $query->orderByDesc('created_at')
+                      ->offset($offset)
+                      ->limit($limit)
+                      ->get();
+
+        // ✅ Bulk load all translations in one query to avoid N+1
+        $titleKeys = $items->pluck('title_key')->filter();
+        $descriptionKeys = $items->pluck('description_key')->filter();
+        $allKeys = $titleKeys->merge($descriptionKeys)->unique();
+
+        $translations = [];
+        if ($allKeys->isNotEmpty()) {
+            $translations = Localization::whereIn('key', $allKeys)
+                ->whereIn('language', ['en', 'ar'])
+                ->where('is_active', true)
+                ->get()
+                ->groupBy('key')
+                ->map(function ($keyTranslations) {
+                    return $keyTranslations->pluck('value', 'language')->toArray();
+                });
+        }
+
+        // ✅ Transform with pre-loaded translations
+        $mediaItems = $items->map(function ($item) use ($translations) {
+            return $this->transformMediaItemForGallery($item, $translations);
+        });
+
+        return $this->buildGalleryResponse($mediaItems, $totalItems, $page, $limit, $offset);
+    });
+}
 
     /**
      * ✅ Optimized media transformation with pre-loaded translations
