@@ -45,7 +45,12 @@ class Media extends Model
 {
     return $this->morphedByMany(Story::class, 'mediable', 'media_relations');
 }
-
+public function aidOrganizations()
+{
+    return $this->morphedByMany(AidOrganization::class, 'mediable', 'media_relations') // ✅ Specify correct table
+                ->withPivot('sort_order')
+                ->orderBy('sort_order');
+}
     // Scopes
     public function scopeActive(Builder $query): Builder
     {

@@ -1,4 +1,4 @@
-// resources/js/pages/Stories/Index.tsx
+// resources/js/pages/Stories/Index.tsx (FULLY FIXED VERSION)
 
 import { useState, useEffect } from 'react';
 import { Head, Link, router } from '@inertiajs/react';
@@ -32,7 +32,7 @@ interface Story {
     description: { en: string; ar: string };
     backgroundImage?: string;
     url: string;
-  };
+  } | string;
   media_count: number;
   is_active: boolean;
   is_featured: boolean;
@@ -43,7 +43,7 @@ interface Story {
 interface Props {
   stories: {
     data: Story[];
-    links: any[];
+    links: any[] | string; // ✅ Allow string for parsing
     meta: {
       current_page: number;
       last_page: number;
@@ -65,15 +65,55 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 export default function StoriesIndex(props: Props) {
+  console.log('Stories Props Received:', props); // ✅ Debug log
+
   const {
     stories = null,
     filters = null
   } = props || {};
 
-  // Create safe data objects
+  // ✅ Helper function to parse translated content
+  const parseTranslatedContent = (translatedContent: any) => {
+    if (typeof translatedContent === 'string') {
+      try {
+        const parsed = JSON.parse(translatedContent);
+        console.log('Parsed translated content:', parsed); // ✅ Debug log
+        return parsed;
+      } catch (e) {
+        console.error('Error parsing translated content:', e, 'Raw content:', translatedContent);
+        return {
+          title: { en: 'Untitled Story', ar: 'قصة بدون عنوان' },
+          description: { en: 'No description', ar: 'لا يوجد وصف' },
+          backgroundImage: null,
+          url: ''
+        };
+      }
+    }
+    return translatedContent || {
+      title: { en: 'Untitled Story', ar: 'قصة بدون عنوان' },
+      description: { en: 'No description', ar: 'لا يوجد وصف' },
+      backgroundImage: null,
+      url: ''
+    };
+  };
+
+  // ✅ Helper function to parse links if they're stringified
+  const parseLinks = (links: any[] | string) => {
+    if (typeof links === 'string') {
+      try {
+        return JSON.parse(links);
+      } catch (e) {
+        console.error('Error parsing links:', e);
+        return [];
+      }
+    }
+    return Array.isArray(links) ? links : [];
+  };
+
+  // ✅ Create safe data objects with proper parsing
   const safeStories = {
     data: stories?.data || [],
-    links: stories?.links || [],
+    links: parseLinks(stories?.links || []),
     meta: {
       current_page: stories?.meta?.current_page || 1,
       last_page: stories?.meta?.last_page || 1,
@@ -83,6 +123,7 @@ export default function StoriesIndex(props: Props) {
       to: stories?.meta?.to || null,
     }
   };
+
 
   const safeFilters = filters || {};
 
@@ -203,10 +244,13 @@ export default function StoriesIndex(props: Props) {
     searchTerm?.trim() || 
     selectedFeatured !== '__all__'
   );
-  const isEmpty = safeStories.meta.total === 0;
+  
+  // ✅ FIXED: Check both data array length AND meta total
+  const isEmpty = safeStories.data.length === 0 || safeStories.meta.total === 0;
   const totalResults = safeStories.meta.total;
   const fromResult = safeStories.meta.from;
   const toResult = safeStories.meta.to;
+
 
   const renderResultsInfo = () => {
     if (isEmpty && !hasActiveFilters) {
@@ -259,11 +303,13 @@ export default function StoriesIndex(props: Props) {
     </Card>
   );
 
+
   return (
     <AppLayout breadcrumbs={breadcrumbs}>
       <Head title="Stories of Hope" />
       
       <div className="flex h-full flex-1 flex-col gap-4 rounded-xl p-4 overflow-x-auto">
+
         {/* Header */}
         <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-center">
           <div className="space-y-1">
@@ -306,7 +352,6 @@ export default function StoriesIndex(props: Props) {
           </CardHeader>
           <CardContent className="p-6">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Search Input */}
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
                 <Input
@@ -318,7 +363,6 @@ export default function StoriesIndex(props: Props) {
                 />
               </div>
               
-              {/* Featured Filter */}
               <Select value={selectedFeatured} onValueChange={(value) => {
                 setSelectedFeatured(value);
                 applyFiltersWithValues({ featured: value });
@@ -333,7 +377,6 @@ export default function StoriesIndex(props: Props) {
                 </SelectContent>
               </Select>
 
-              {/* Search Button */}
               <Button onClick={applyFilters} className="gap-2">
                 <Search className="w-4 h-4" />
                 Search
@@ -342,8 +385,8 @@ export default function StoriesIndex(props: Props) {
           </CardContent>
         </Card>
 
-        {/* Content */}
-        {isEmpty ? (
+        {/* ✅ ALWAYS SHOW CONTENT - Don't check isEmpty for now */}
+        {safeStories.data.length === 0 ? (
           <EmptyState />
         ) : (
           <>
@@ -370,128 +413,132 @@ export default function StoriesIndex(props: Props) {
               </Card>
             )}
 
-            {/* Stories Grid */}
+            {/* ✅ Stories Grid - FIXED */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {safeStories.data.map((story) => (
-                <Card key={story.id} className="overflow-hidden group">
-                  <div className="relative">
-                    {/* Selection Checkbox */}
-                    <div className="absolute top-3 left-3 z-10">
-                      <Checkbox
-                        checked={selectedItems.includes(story.id)}
-                        onCheckedChange={(checked) => handleSelectItem(story.id, Boolean(checked))}
-                      />
-                    </div>
-
-                    {/* Featured Star */}
-                    <button
-                      onClick={() => toggleFeatured(story)}
-                      className="absolute top-3 right-3 z-10 p-1 rounded-full bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      {story.is_featured ? (
-                        <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                      ) : (
-                        <StarOff className="w-4 h-4" />
-                      )}
-                    </button>
-
-                    {/* Story Image */}
-                    <div className="aspect-[4/3] bg-muted flex items-center justify-center">
-                      {story.translated_content.backgroundImage ? (
-                        <img
-                          src={story.translated_content.backgroundImage}
-                          alt={story.translated_content.title.en}
-                          className="w-full h-full object-cover"
+              {safeStories.data.map((story, index) => {
+                console.log(`Rendering story ${index + 1}:`, story.id, story.story_id); // ✅ Debug log
+                
+                // ✅ Parse the translated content properly
+                const translatedContent = parseTranslatedContent(story.translated_content);
+                
+                console.log(`Story ${story.id} translated content:`, translatedContent); // ✅ Debug log
+                
+                return (
+                  <Card key={story.id} className="overflow-hidden group">
+                    <div className="relative">
+                      <div className="absolute top-3 left-3 z-10">
+                        <Checkbox
+                          checked={selectedItems.includes(story.id)}
+                          onCheckedChange={(checked) => handleSelectItem(story.id, Boolean(checked))}
                         />
-                      ) : (
-                        <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                          <BookOpen className="w-8 h-8" />
-                          <span className="text-xs">No image</span>
-                        </div>
-                      )}
-                    </div>
+                      </div>
 
-                    {/* Story Type Badge */}
-                    <div className="absolute bottom-3 left-3">
-                      <Badge variant="secondary" className="gap-1">
-                        <Heart className="w-3 h-3" />
-                        Hope Story
-                      </Badge>
-                    </div>
-                  </div>
+                      <button
+                        onClick={() => toggleFeatured(story)}
+                        className="absolute top-3 right-3 z-10 p-1 rounded-full bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        {story.is_featured ? (
+                          <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+                        ) : (
+                          <StarOff className="w-4 h-4" />
+                        )}
+                      </button>
 
-                  <CardContent className="p-4">
-                    <div className="space-y-3">
-                      {/* Title */}
-                      <h3 className="font-semibold text-sm line-clamp-2">
-                        {story.translated_content.title.en || 'Untitled Story'}
-                      </h3>
-
-                      {/* Arabic Title */}
-                      <p className="text-xs text-muted-foreground line-clamp-1" dir="rtl">
-                        {story.translated_content.title.ar || 'قصة بدون عنوان'}
-                      </p>
-
-                      {/* Description */}
-                      <p className="text-xs text-muted-foreground line-clamp-3">
-                        {story.translated_content.description.en || 'No description'}
-                      </p>
-
-                      {/* Story Info */}
-                      <div className="space-y-1">
-                        {story.media_count > 0 && (
-                          <div className="text-xs text-muted-foreground">
-                            {story.media_count} media item{story.media_count !== 1 ? 's' : ''}
+                      <div className="aspect-[4/3] bg-muted flex items-center justify-center">
+                        {translatedContent.backgroundImage ? (
+                          <img
+                            src={translatedContent.backgroundImage}
+                            alt={translatedContent.title?.en || 'Story image'}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              console.error('Image failed to load:', translatedContent.backgroundImage);
+                              e.currentTarget.style.display = 'none';
+                            }}
+                          />
+                        ) : (
+                          <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                            <BookOpen className="w-8 h-8" />
+                            <span className="text-xs">No image</span>
                           </div>
                         )}
-                        <div className="text-xs text-muted-foreground">
-                          Story ID: {story.story_id}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          Created: {new Date(story.created_at).toLocaleDateString()}
-                        </div>
                       </div>
 
-                      {/* Actions */}
-                      <div className="flex justify-between items-center pt-2">
-                        <div className="flex gap-1">
-                          <Link href={`/stories/${story.id}`}>
-                            <Button variant="outline" size="sm" className="h-8 w-8 p-0">
-                              <Eye className="w-4 h-4" />
-                            </Button>
-                          </Link>
-                          <Link href={`/stories/${story.id}/edit`}>
-                            <Button variant="outline" size="sm" className="h-8 w-8 p-0">
-                              <Edit className="w-4 h-4" />
-                            </Button>
-                          </Link>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleDelete(story.id)}
-                            className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-
-                        <div className="flex gap-1">
-                          {story.is_featured && (
-                            <Badge variant="default" className="text-xs">
-                              Featured
-                            </Badge>
-                          )}
-                          {!story.is_active && (
-                            <Badge variant="secondary" className="text-xs">
-                              Inactive
-                            </Badge>
-                          )}
-                        </div>
+                      <div className="absolute bottom-3 left-3">
+                        <Badge variant="secondary" className="gap-1">
+                          <Heart className="w-3 h-3" />
+                          Hope Story
+                        </Badge>
                       </div>
                     </div>
-                  </CardContent>
-                </Card>
-              ))}
+
+                    <CardContent className="p-4">
+                      <div className="space-y-3">
+                        <h3 className="font-semibold text-sm line-clamp-2">
+                          {translatedContent.title?.en || story.story_id || 'Untitled Story'}
+                        </h3>
+
+                        <p className="text-xs text-muted-foreground line-clamp-1" dir="rtl">
+                          {translatedContent.title?.ar || 'قصة بدون عنوان'}
+                        </p>
+
+                        <p className="text-xs text-muted-foreground line-clamp-3">
+                          {translatedContent.description?.en || 'No description'}
+                        </p>
+
+                        <div className="space-y-1">
+                          {story.media_count > 0 && (
+                            <div className="text-xs text-muted-foreground">
+                              {story.media_count} media item{story.media_count !== 1 ? 's' : ''}
+                            </div>
+                          )}
+                          <div className="text-xs text-muted-foreground">
+                            Story ID: {story.story_id}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            Created: {new Date(story.created_at).toLocaleDateString()}
+                          </div>
+                        </div>
+
+                        <div className="flex justify-between items-center pt-2">
+                          <div className="flex gap-1">
+                            <Link href={`/stories/${story.id}`}>
+                              <Button variant="outline" size="sm" className="h-8 w-8 p-0">
+                                <Eye className="w-4 h-4" />
+                              </Button>
+                            </Link>
+                            <Link href={`/stories/${story.id}/edit`}>
+                              <Button variant="outline" size="sm" className="h-8 w-8 p-0">
+                                <Edit className="w-4 h-4" />
+                              </Button>
+                            </Link>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleDelete(story.id)}
+                              className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+
+                          <div className="flex gap-1">
+                            {story.is_featured && (
+                              <Badge variant="default" className="text-xs">
+                                Featured
+                              </Badge>
+                            )}
+                            {!story.is_active && (
+                              <Badge variant="secondary" className="text-xs">
+                                Inactive
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
 
             {/* Pagination */}
@@ -551,7 +598,6 @@ export default function StoriesIndex(props: Props) {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Bulk Delete Confirmation Dialog */}
       <AlertDialog open={bulkDeleteDialogOpen} onOpenChange={setBulkDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>

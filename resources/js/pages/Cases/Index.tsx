@@ -1,4 +1,4 @@
-// resources/js/pages/Cases/Index.tsx
+// resources/js/pages/Cases/Index.tsx (FULLY FIXED VERSION)
 
 import { useState, useEffect } from 'react';
 import { Head, Link, router } from '@inertiajs/react';
@@ -17,7 +17,7 @@ import {
   Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious
 } from '@/components/ui/pagination';
 import {
-  Trash2, Edit, Plus, Search, Filter, RotateCcw, Eye, Star, StarOff, Calendar, MapPin
+  Trash2, Edit, Plus, Search, Filter, RotateCcw, Eye, Star, StarOff, Calendar, MapPin, FileText
 } from 'lucide-react';
 import { type BreadcrumbItem } from '@/types';
 
@@ -40,7 +40,7 @@ interface Case {
     description?: { en: string; ar: string } | null;
     imagePath?: string;
     details: CaseDetail[];
-  };
+  } | string; // ✅ Allow string for parsing
   media_count: number;
   is_active: boolean;
   is_featured: boolean;
@@ -49,7 +49,7 @@ interface Case {
 interface Props {
   cases: {
     data: Case[];
-    links: any[];
+    links: any[] | string; // ✅ Allow string for parsing
     meta: {
       current_page: number;
       last_page: number;
@@ -59,7 +59,7 @@ interface Props {
       to: number | null;
     };
   } | null;
-  caseTypes: Record<string, { en: string; ar: string }>;
+  caseTypes: Record<string, { en: string; ar: string } | string>; // ✅ Allow string for parsing
   filters: {
     type?: string;
     featured?: string;
@@ -73,16 +73,74 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 export default function CasesIndex(props: Props) {
+
   const {
     cases = null,
     caseTypes = {},
     filters = null
   } = props || {};
 
-  // Create safe data objects
+  // ✅ Helper function to parse translated content
+  const parseTranslatedContent = (translatedContent: any) => {
+    if (typeof translatedContent === 'string') {
+      try {
+        const parsed = JSON.parse(translatedContent);
+        return parsed;
+      } catch (e) {
+        console.error('Error parsing case translated content:', e, 'Raw content:', translatedContent);
+        return {
+          title: { en: 'Untitled', ar: 'بدون عنوان' },
+          description: { en: 'No description', ar: 'لا يوجد وصف' },
+          details: [],
+          imagePath: null
+        };
+      }
+    }
+    return translatedContent || {
+      title: { en: 'Untitled', ar: 'بدون عنوان' },
+      description: { en: 'No description', ar: 'لا يوجد وصف' },
+      details: [],
+      imagePath: null
+    };
+  };
+
+  // ✅ Helper function to parse case types
+  const parseCaseTypes = (types: Record<string, { en: string; ar: string } | string>) => {
+    const parsed: Record<string, { en: string; ar: string }> = {};
+    
+    Object.entries(types).forEach(([key, value]) => {
+      if (typeof value === 'string') {
+        try {
+          parsed[key] = JSON.parse(value);
+        } catch (e) {
+          console.error(`Error parsing case type ${key}:`, e);
+          parsed[key] = { en: key, ar: key };
+        }
+      } else {
+        parsed[key] = value;
+      }
+    });
+    
+    return parsed;
+  };
+
+  // ✅ Helper function to parse links if they're stringified
+  const parseLinks = (links: any[] | string) => {
+    if (typeof links === 'string') {
+      try {
+        return JSON.parse(links);
+      } catch (e) {
+        console.error('Error parsing links:', e);
+        return [];
+      }
+    }
+    return Array.isArray(links) ? links : [];
+  };
+
+  // ✅ Create safe data objects with proper parsing
   const safeCases = {
     data: cases?.data || [],
-    links: cases?.links || [],
+    links: parseLinks(cases?.links || []),
     meta: {
       current_page: cases?.meta?.current_page || 1,
       last_page: cases?.meta?.last_page || 1,
@@ -94,6 +152,9 @@ export default function CasesIndex(props: Props) {
   };
 
   const safeFilters = filters || {};
+  const parsedCaseTypes = parseCaseTypes(caseTypes); // ✅ Parse the case types
+
+
 
   const [searchTerm, setSearchTerm] = useState(safeFilters.search || '');
   const [selectedType, setSelectedType] = useState(safeFilters.type || '__all__');
@@ -223,10 +284,14 @@ export default function CasesIndex(props: Props) {
     selectedType !== '__all__' || 
     selectedFeatured !== '__all__'
   );
-  const isEmpty = safeCases.meta.total === 0;
+  
+  // ✅ FIXED: Check both data array length AND meta total
+  const isEmpty = safeCases.data.length === 0 || safeCases.meta.total === 0;
   const totalResults = safeCases.meta.total;
   const fromResult = safeCases.meta.from;
   const toResult = safeCases.meta.to;
+
+
 
   const renderResultsInfo = () => {
     if (isEmpty && !hasActiveFilters) {
@@ -247,7 +312,7 @@ export default function CasesIndex(props: Props) {
       <CardContent className="py-16">
         <div className="text-center space-y-4">
           <div className="mx-auto w-16 h-16 bg-muted rounded-full flex items-center justify-center">
-            <Search className="w-8 h-8 text-muted-foreground" />
+            <FileText className="w-8 h-8 text-muted-foreground" />
           </div>
           <div className="space-y-2">
             <h3 className="text-lg font-semibold">
@@ -279,11 +344,14 @@ export default function CasesIndex(props: Props) {
     </Card>
   );
 
+
+
   return (
     <AppLayout breadcrumbs={breadcrumbs}>
       <Head title="Cases" />
       
       <div className="flex h-full flex-1 flex-col gap-4 rounded-xl p-4 overflow-x-auto">
+
         {/* Header */}
         <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-center">
           <div className="space-y-1">
@@ -326,7 +394,6 @@ export default function CasesIndex(props: Props) {
           </CardHeader>
           <CardContent className="p-6">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              {/* Search Input */}
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
                 <Input
@@ -338,7 +405,6 @@ export default function CasesIndex(props: Props) {
                 />
               </div>
               
-              {/* Type Filter */}
               <Select value={selectedType} onValueChange={(value) => {
                 setSelectedType(value);
                 applyFiltersWithValues({ type: value });
@@ -348,7 +414,7 @@ export default function CasesIndex(props: Props) {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__all__">All Types</SelectItem>
-                  {Object.entries(caseTypes).map(([key, label]) => (
+                  {Object.entries(parsedCaseTypes).map(([key, label]) => (
                     <SelectItem key={key} value={key}>
                       {label.en}
                     </SelectItem>
@@ -356,7 +422,6 @@ export default function CasesIndex(props: Props) {
                 </SelectContent>
               </Select>
 
-              {/* Featured Filter */}
               <Select value={selectedFeatured} onValueChange={(value) => {
                 setSelectedFeatured(value);
                 applyFiltersWithValues({ featured: value });
@@ -371,7 +436,6 @@ export default function CasesIndex(props: Props) {
                 </SelectContent>
               </Select>
 
-              {/* Search Button */}
               <Button onClick={applyFilters} className="gap-2">
                 <Search className="w-4 h-4" />
                 Search
@@ -380,8 +444,8 @@ export default function CasesIndex(props: Props) {
           </CardContent>
         </Card>
 
-        {/* Content */}
-        {isEmpty ? (
+        {/* ✅ ALWAYS SHOW CONTENT - Don't check isEmpty for now */}
+        {safeCases.data.length === 0 ? (
           <EmptyState />
         ) : (
           <>
@@ -408,121 +472,138 @@ export default function CasesIndex(props: Props) {
               </Card>
             )}
 
-            {/* Cases Grid */}
+            {/* ✅ Cases Grid - FIXED */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {safeCases.data.map((caseItem) => (
-                <Card key={caseItem.id} className="overflow-hidden group">
-                  <div className="relative">
-                    {/* Selection Checkbox */}
-                    <div className="absolute top-3 left-3 z-10">
-                      <Checkbox
-                        checked={selectedItems.includes(caseItem.id)}
-                        onCheckedChange={(checked) => handleSelectItem(caseItem.id, Boolean(checked))}
-                      />
-                    </div>
-
-                    {/* Featured Star */}
-                    <button
-                      onClick={() => toggleFeatured(caseItem)}
-                      className="absolute top-3 right-3 z-10 p-1 rounded-full bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      {caseItem.is_featured ? (
-                        <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                      ) : (
-                        <StarOff className="w-4 h-4" />
-                      )}
-                    </button>
-
-                    {/* Case Image */}
-                    <div className="aspect-[4/3] bg-muted flex items-center justify-center">
-                      {caseItem.translated_content.imagePath ? (
-                        <img
-                          src={caseItem.translated_content.imagePath}
-                          alt={caseItem.translated_content.title.en}
-                          className="w-full h-full object-cover"
+              {safeCases.data.map((caseItem, index) => {
+                console.log(`Rendering case ${index + 1}:`, caseItem.id, caseItem.case_id); // ✅ Debug log
+                
+                // ✅ Parse the translated content properly
+                const translatedContent = parseTranslatedContent(caseItem.translated_content);
+                
+                console.log(`Case ${caseItem.id} translated content:`, translatedContent); // ✅ Debug log
+                
+                return (
+                  <Card key={caseItem.id} className="overflow-hidden group">
+                    <div className="relative">
+                      <div className="absolute top-3 left-3 z-10">
+                        <Checkbox
+                          checked={selectedItems.includes(caseItem.id)}
+                          onCheckedChange={(checked) => handleSelectItem(caseItem.id, Boolean(checked))}
                         />
-                      ) : (
-                        <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                          <Search className="w-8 h-8" />
-                          <span className="text-xs">No image</span>
-                        </div>
-                      )}
-                    </div>
+                      </div>
 
-                    {/* Case Type Badge */}
-                    <div className="absolute bottom-3 left-3">
-                      <Badge variant="secondary" className="capitalize">
-                        {caseTypes[caseItem.type]?.en || caseItem.type}
-                      </Badge>
-                    </div>
-                  </div>
-
-                  <CardContent className="p-4">
-                    <div className="space-y-3">
-                      {/* Title */}
-                      <h3 className="font-semibold text-sm line-clamp-2">
-                        {caseItem.translated_content.title.en || 'Untitled'}
-                      </h3>
-
-                      {/* Description */}
-                      <p className="text-xs text-muted-foreground line-clamp-3">
-                        {caseItem.translated_content.description?.en || 'No description'}
-                      </p>
-
-                      {/* Case Info */}
-                      <div className="space-y-1">
-                        {caseItem.location && (
-                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                            <MapPin className="w-3 h-3" />
-                            {caseItem.location}
-                          </div>
+                      <button
+                        onClick={() => toggleFeatured(caseItem)}
+                        className="absolute top-3 right-3 z-10 p-1 rounded-full bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        {caseItem.is_featured ? (
+                          <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+                        ) : (
+                          <StarOff className="w-4 h-4" />
                         )}
-                        {caseItem.incident_date && (
-                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                            <Calendar className="w-3 h-3" />
-                            {new Date(caseItem.incident_date).toLocaleDateString()}
-                          </div>
-                        )}
-                        {caseItem.media_count > 0 && (
-                          <div className="text-xs text-muted-foreground">
-                            {caseItem.media_count} media item{caseItem.media_count !== 1 ? 's' : ''}
+                      </button>
+
+                      <div className="aspect-[4/3] bg-muted flex items-center justify-center">
+                        {translatedContent.imagePath ? (
+                          <img
+                            src={translatedContent.imagePath}
+                            alt={translatedContent.title?.en || 'Case image'}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              console.error('Case image failed to load:', translatedContent.imagePath);
+                              e.currentTarget.style.display = 'none';
+                            }}
+                          />
+                        ) : (
+                          <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                            <FileText className="w-8 h-8" />
+                            <span className="text-xs">No image</span>
                           </div>
                         )}
                       </div>
 
-                      {/* Actions */}
-                      <div className="flex justify-between items-center pt-2">
-                        <div className="flex gap-1">
-                          <Link href={`/cases/${caseItem.id}`}>
-                            <Button variant="outline" size="sm" className="h-8 w-8 p-0">
-                              <Eye className="w-4 h-4" />
-                            </Button>
-                          </Link>
-                          <Link href={`/cases/${caseItem.id}/edit`}>
-                            <Button variant="outline" size="sm" className="h-8 w-8 p-0">
-                              <Edit className="w-4 h-4" />
-                            </Button>
-                          </Link>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleDelete(caseItem.id)}
-                            className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-
-                        {caseItem.is_featured && (
-                          <Badge variant="default" className="text-xs">
-                            Featured
-                          </Badge>
-                        )}
+                      <div className="absolute bottom-3 left-3">
+                        <Badge variant="secondary" className="capitalize">
+                          {parsedCaseTypes[caseItem.type]?.en || caseItem.type}
+                        </Badge>
                       </div>
                     </div>
-                  </CardContent>
-                </Card>
-              ))}
+
+                    <CardContent className="p-4">
+                      <div className="space-y-3">
+                        <h3 className="font-semibold text-sm line-clamp-2">
+                          {translatedContent.title?.en || caseItem.case_id || 'Untitled'}
+                        </h3>
+
+                        <p className="text-xs text-muted-foreground line-clamp-3">
+                          {translatedContent.description?.en || 'No description'}
+                        </p>
+
+                        <div className="space-y-1">
+                          {caseItem.location && (
+                            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                              <MapPin className="w-3 h-3" />
+                              {caseItem.location}
+                            </div>
+                          )}
+                          {caseItem.incident_date && (
+                            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                              <Calendar className="w-3 h-3" />
+                              {new Date(caseItem.incident_date).toLocaleDateString()}
+                            </div>
+                          )}
+                          {caseItem.media_count > 0 && (
+                            <div className="text-xs text-muted-foreground">
+                              {caseItem.media_count} media item{caseItem.media_count !== 1 ? 's' : ''}
+                            </div>
+                          )}
+                          {translatedContent.details && translatedContent.details.length > 0 && (
+                            <div className="text-xs text-muted-foreground">
+                              {translatedContent.details.length} detail{translatedContent.details.length !== 1 ? 's' : ''}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="flex justify-between items-center pt-2">
+                          <div className="flex gap-1">
+                            <Link href={`/cases/${caseItem.id}`}>
+                              <Button variant="outline" size="sm" className="h-8 w-8 p-0">
+                                <Eye className="w-4 h-4" />
+                              </Button>
+                            </Link>
+                            <Link href={`/cases/${caseItem.id}/edit`}>
+                              <Button variant="outline" size="sm" className="h-8 w-8 p-0">
+                                <Edit className="w-4 h-4" />
+                              </Button>
+                            </Link>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleDelete(caseItem.id)}
+                              className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+
+                          <div className="flex gap-1">
+                            {caseItem.is_featured && (
+                              <Badge variant="default" className="text-xs">
+                                Featured
+                              </Badge>
+                            )}
+                            {!caseItem.is_active && (
+                              <Badge variant="secondary" className="text-xs">
+                                Inactive
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
 
             {/* Pagination */}
@@ -582,7 +663,6 @@ export default function CasesIndex(props: Props) {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Bulk Delete Confirmation Dialog */}
       <AlertDialog open={bulkDeleteDialogOpen} onOpenChange={setBulkDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>

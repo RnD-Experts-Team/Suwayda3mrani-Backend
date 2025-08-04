@@ -40,10 +40,12 @@ class Cases extends Model
         return $this->hasMany(CaseDetail::class, 'case_id')->orderBy('sort_order');
     }
 
-    public function media(): MorphMany
-    {
-        return $this->morphMany(Media::class, 'mediable');
-    }
+    public function media()
+{
+    return $this->morphToMany(Media::class, 'mediable', 'media_relations') // ✅ Specify correct table
+                ->withPivot('sort_order')
+                ->orderBy('sort_order');
+}
 
     public function getMediaItems()
     {
@@ -73,59 +75,77 @@ class Cases extends Model
 
     // Helper Methods
     public function getMultilingualContent()
-    {
-        $titleTranslations = $this->getTranslationsForKey($this->title_key);
-        $descriptionTranslations = $this->description_key ? $this->getTranslationsForKey($this->description_key) : null;
-        
-        // Get case details with translations
-        $details = $this->details->map(function ($detail) {
-            return [
-                'key' => $detail->getKeyTranslations(),
-                'value' => $detail->getValueTranslations(),
+{
+    $titleTranslations = $this->getTranslationsForKey($this->title_key);
+    $descriptionTranslations = $this->getTranslationsForKey($this->description_key);
+    
+    // ✅ FIXED: Get media from THIS case, not from Media model
+    $caseMedia = $this->media; // This gets media attached to this case
+    $imagePath = null;
+    
+    if ($caseMedia && $caseMedia->count() > 0) {
+        $firstMedia = $caseMedia->first();
+        $mediaContent = $firstMedia->getMultilingualContent();
+        $imagePath = $mediaContent['url'] ?? null;
+    }
+
+    // Get case details with translations
+    $details = [];
+    if ($this->details) {
+        foreach ($this->details as $detail) {
+            $keyTranslations = $this->getTranslationsForKey($detail->key_localization_key);
+            $valueTranslations = $this->getTranslationsForKey($detail->value_localization_key);
+            
+            $details[] = [
+                'key' => [
+                    'en' => $keyTranslations['en'] ?? '',
+                    'ar' => $keyTranslations['ar'] ?? ''
+                ],
+                'value' => [
+                    'en' => $valueTranslations['en'] ?? '',
+                    'ar' => $valueTranslations['ar'] ?? ''
+                ],
                 'sort_order' => $detail->sort_order
             ];
-        });
-
-        // Get primary image (first uploaded image)
-        $primaryMedia = $this->getMediaItems()->where('type', 'image')->first();
-        $imagePath = $primaryMedia ? $primaryMedia->getMultilingualContent()['url'] : null;
-
-        return [
-            'id' => $this->id,
-            'case_id' => $this->case_id,
-            'type' => $this->type,
-            'url' => $this->external_url,
-            'url_slug' => $this->url_slug,
-            'incident_date' => $this->incident_date?->format('Y-m-d'),
-            'location' => $this->location,
-            'imagePath' => $imagePath,
-            'title' => [
-                'en' => $titleTranslations['en'] ?? '',
-                'ar' => $titleTranslations['ar'] ?? ''
-            ],
-            'description' => $descriptionTranslations ? [
-                'en' => $descriptionTranslations['en'] ?? '',
-                'ar' => $descriptionTranslations['ar'] ?? ''
-            ] : null,
-            'details' => $details->toArray(),
-            'metadata' => $this->metadata
-        ];
+        }
     }
 
-    private function getTranslationsForKey($key)
-    {
-        if (!$key) return ['en' => '', 'ar' => ''];
+    return [
+        'id' => $this->id,
+        'case_id' => $this->case_id,
+        'type' => $this->type,
+        'url_slug' => $this->url_slug,
+        'external_url' => $this->external_url,
+        'incident_date' => $this->incident_date?->format('Y-m-d'),
+        'location' => $this->location,
+        'imagePath' => $imagePath,
+        'title' => [
+            'en' => $titleTranslations['en'] ?? '',
+            'ar' => $titleTranslations['ar'] ?? ''
+        ],
+        'description' => [
+            'en' => $descriptionTranslations['en'] ?? '',
+            'ar' => $descriptionTranslations['ar'] ?? ''
+        ],
+        'details' => $details,
+        'url' => $this->external_url ?: "/cases/{$this->url_slug}"
+    ];
+}
 
-        $translations = Localization::where('key', $key)
-            ->whereIn('language', ['en', 'ar'])
-            ->pluck('value', 'language')
-            ->toArray();
+private function getTranslationsForKey($key)
+{
+    if (!$key) return ['en' => '', 'ar' => ''];
 
-        return [
-            'en' => $translations['en'] ?? '',
-            'ar' => $translations['ar'] ?? ''
-        ];
-    }
+    $translations = Localization::where('key', $key)
+        ->whereIn('language', ['en', 'ar'])
+        ->pluck('value', 'language')
+        ->toArray();
+
+    return [
+        'en' => $translations['en'] ?? '',
+        'ar' => $translations['ar'] ?? ''
+    ];
+}
 
     public function attachMedia($mediaIds)
     {

@@ -17,7 +17,6 @@ class CasesController extends Controller
     public function index(Request $request)
     {
         $query = Cases::with(['details', 'media']);
-
         // Filter by type
         if ($request->filled('type')) {
             $query->byType($request->type);
@@ -43,10 +42,11 @@ class CasesController extends Controller
 
         // Add translated content to each case
         $cases->getCollection()->transform(function ($item) {
+  
             $item->translated_content = $item->getMultilingualContent();
-            $item->media_count = $item->media->count();
-            return $item;
-        });
+            $item->media_count = $item->media ? $item->media->count() : 0;
+        return $item;
+    });
 
         return Inertia::render('Cases/Index', [
             'cases' => $cases,

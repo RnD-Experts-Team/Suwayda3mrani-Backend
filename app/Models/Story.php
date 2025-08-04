@@ -29,9 +29,11 @@ class Story extends Model
     ];
 
     // Relationships
-    public function media(): MorphMany
+    public function media()
     {
-        return $this->morphMany(Media::class, 'mediable', 'media_relations');
+        return $this->morphToMany(Media::class, 'mediable', 'media_relations')
+                    ->withPivot('sort_order')
+                    ->orderBy('sort_order');
     }
 
     public function getMediaItems()
