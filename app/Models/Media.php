@@ -183,4 +183,56 @@ public function aidOrganizations()
             return $media->getMultilingualContent();
         })->toArray();
     }
+
+    /**
+ * Get media content specifically formatted for the gallery frontend
+ * This is separate from getMultilingualContent() to avoid breaking existing functionality
+ */
+public function getGalleryContent(): array
+{
+    // Get translations
+    $titleTranslations = $this->getTranslationsForKey($this->title_key);
+    $descriptionTranslations = $this->getTranslationsForKey($this->description_key);
+
+    return [
+        'id' => $this->id,
+        'media_id' => $this->media_id,
+        'src' => $this->getDirectUrl(),
+        'thumbnail' => $this->getThumbnailUrl() ?: $this->getDirectUrl(),
+        'alt' => $titleTranslations['en'] ?: "Media item {$this->id}",
+        'title' => [
+            'en' => $titleTranslations['en'] ?? '',
+            'ar' => $titleTranslations['ar'] ?? ''
+        ],
+        'description' => [
+            'en' => $descriptionTranslations['en'] ?? '',
+            'ar' => $descriptionTranslations['ar'] ?? ''
+        ],
+        'type' => $this->type,
+        'source_url' => $this->source_url,
+        'created_at' => $this->created_at?->toISOString()
+    ];
+}
+
+/**
+ * Helper method to get translations for both languages at once
+ * Only used by getGalleryContent()
+ */
+private function getTranslationsForKey(?string $key): array
+{
+    if (!$key) {
+        return ['en' => '', 'ar' => ''];
+    }
+
+    $translations = \App\Models\Localization::where('key', $key)
+        ->whereIn('language', ['en', 'ar'])
+        ->where('is_active', true)
+        ->pluck('value', 'language')
+        ->toArray();
+
+    return [
+        'en' => $translations['en'] ?? '',
+        'ar' => $translations['ar'] ?? ''
+    ];
+}
 }

@@ -16,3 +16,4 @@ Route::get('/aid-efforts', [FrontEndController::class, 'aidEffortsFront']);
 Route::get('/testimonials', [FrontEndController::class, 'testimonialsFront']);
 Route::get('/organization/{organizationId}', [FrontEndController::class, 'organizationDetailFront']);
 Route::get('/testimony/{testimonyId}', [FrontEndController::class, 'testimonyDetailFront']);
+Route::get('/media-gallery', [FrontEndController::class, 'getMediaItems']);
