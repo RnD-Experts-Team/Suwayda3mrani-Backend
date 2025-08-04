@@ -9,6 +9,7 @@ use App\Http\Controllers\AidCategoryController;
 use App\Http\Controllers\AidOrganizationController;
 use App\Http\Controllers\CasesController;
 use App\Http\Controllers\StoriesController;
+use App\Http\Controllers\TimelineEventController;
 
 Route::get('/', function () {
     return Inertia::render('welcome');
@@ -38,6 +39,9 @@ Route::middleware(['auth'])->group(function () {
     Route::resource('stories', StoriesController::class);
     Route::post('stories/bulk-delete', [StoriesController::class, 'bulkDelete'])->name('stories.bulk-delete');
     Route::patch('stories/{story}/toggle-featured', [StoriesController::class, 'toggleFeatured'])->name('stories.toggle-featured');
+    Route::resource('timeline-events', TimelineEventController::class);
+    Route::post('timeline-events/bulk-delete', [TimelineEventController::class, 'bulkDelete'])->name('timeline-events.bulk-delete');
+    Route::patch('timeline-events/{timelineEvent}/toggle-highlighted', [TimelineEventController::class, 'toggleHighlighted'])->name('timeline-events.toggle-highlighted');
 });
 
 require __DIR__.'/settings.php';

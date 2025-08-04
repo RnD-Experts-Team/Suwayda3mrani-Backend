@@ -47,6 +47,11 @@ const mainNavItems: NavItem[] = [
         title: 'Stories',
         href: '/stories',
         icon: LayoutGrid,
+    },
+    {
+        title: 'Timeline Events',
+        href: '/timeline-events',
+        icon: LayoutGrid,
     }
 ];
 

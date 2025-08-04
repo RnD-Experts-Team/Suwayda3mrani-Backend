@@ -1133,7 +1133,6 @@ class FrontEndController extends Controller
                 ->active()
                 ->where('id', $organizationId)
                 ->orWhere('organization_id', $organizationId)
-                ->orWhere('url_slug', $organizationId)
                 ->first();
 
             if (!$currentOrganization) {
@@ -1413,4 +1412,42 @@ class FrontEndController extends Controller
 
         return $cache[$key];
     }
+
+    /**
+ * Get timeline events for frontend display
+ */
+public function timelineFront()
+{
+    return Cache::remember('timeline_frontend_data_v1', self::CACHE_DURATION['medium'], function () {
+        
+        // Get all active timeline events
+        $timelineEvents = TimelineEvent::with(['media'])
+            ->active()
+            ->ordered()
+            ->get();
+
+        // Transform events for both languages
+        $timelineData = [];
+        
+        foreach (['en', 'ar'] as $language) {
+            $timelineData[$language] = [
+                'title' => $language === 'en' ? 'Timeline of the Crisis' : 'الجدول الزمني للأزمة',
+                'items' => $timelineEvents->map(function ($event) use ($language) {
+                    $content = $event->getMultilingualContent();
+                    
+                    return [
+                        'title' => $content['title'][$language],
+                        'period' => $event->period,
+                        'description' => $content['description'][$language],
+                        'isHighlighted' => $event->is_highlighted,
+                        'mediaType' => $content['mediaType'] ?: 'image',
+                        'mediaUrl' => $content['mediaUrl'] ?: 'https://images.unsplash.com/photo-1586829135343-132950070391?w=500&h=300&fit=crop'
+                    ];
+                })->toArray()
+            ];
+        }
+
+        return response()->json($timelineData);
+    });
+}
 }
