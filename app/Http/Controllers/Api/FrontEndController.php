@@ -301,44 +301,70 @@ public function homeFront()
     /**
      * ✅ Optimized dynamic sections builder
      */
-    private function buildDynamicSections($homeSections, &$homeData)
-    {
-        $dynamicSections = $homeSections->reject(fn($section) => $section->type === 'hero');
+    private function buildDynamicSections($homeSections, array &$homeData): void
+{
+    // Ignore the hero – everything else is “dynamic”
+    $dynamicSections = $homeSections->reject(fn ($s) => $s->type === 'hero');
 
-        foreach ($dynamicSections as $section) {
-            $content = $section->getMultilingualContent();
-            
-            $sectionData = [
-                'id' => "{$section->type}-{$section->id}",
-                'type' => $section->type,
-                'sort_order' => $section->sort_order,
-            ];
+    foreach ($dynamicSections as $section) {
+        // Pull translations with the correct model method
+        $contentEn = $section->getTranslatedContent('en');
+        $contentAr = $section->getTranslatedContent('ar');
 
-            switch ($section->type) {
-                case 'component_node':
-                case 'key_events':
-                    $sectionData['content'] = [
-                        'en' => $content['en'] ?? ['category' => '', 'title' => '', 'description' => '', 'imageUrl' => ''],
-                        'ar' => $content['ar'] ?? ['category' => '', 'title' => '', 'description' => '', 'imageUrl' => ''],
-                        'url' => $content['url'] ?? '',
-                    ];
-                    break;
+        $sectionData = [
+            'id'         => "{$section->type}-{$section->id}",
+            'type'       => $section->type,
+            'sort_order' => $section->sort_order,
+        ];
 
-                case 'section_group':
-                    $sectionData['content'] = [
-                        'title' => $content['title'] ?? ['en' => '', 'ar' => ''],
-                        'sections' => $content['sections'] ?? [],
-                    ];
-                    break;
+        switch ($section->type) {
+            // Cards, key events, etc.
+            case 'component_node':
+            case 'key_events':
+                $sectionData['content'] = [
+                    'en' => [
+                        'title'        => $contentEn['title']        ?? '',
+                        'description'  => $contentEn['description']  ?? '',
+                        'imageUrl'     => $contentEn['image']        ?? '',
+                        'buttonText'   => $contentEn['buttonText']   ?? '',
+                        'buttonVariant'=> $contentEn['buttonVariant']?? '',
+                    ],
+                    'ar' => [
+                        'title'        => $contentAr['title']        ?? '',
+                        'description'  => $contentAr['description']  ?? '',
+                        'imageUrl'     => $contentAr['image']        ?? '',
+                        'buttonText'   => $contentAr['buttonText']   ?? '',
+                        'buttonVariant'=> $contentAr['buttonVariant']?? '',
+                    ],
+                    // Optional: add a URL derived from the action_key column if you have one
+                    'url' => $section->action_key ?? '',
+                ];
+                break;
 
-                case 'suggestions':
-                    $sectionData['content'] = $content['suggestions'] ?? [];
-                    break;
-            }
+            // A parent section that groups child sections
+            case 'section_group':
+                $sectionData['content'] = [
+                    'title' => [
+                        'en' => $contentEn['title'] ?? '',
+                        'ar' => $contentAr['title'] ?? '',
+                    ],
+                    // Fill this if you load child sections elsewhere
+                    'sections' => [],
+                ];
+                break;
 
-            $homeData[] = $sectionData;
+            // Simple suggestion blocks
+            case 'suggestions':
+                $sectionData['content'] = [
+                    'en' => $contentEn,
+                    'ar' => $contentAr,
+                ];
+                break;
         }
+
+        $homeData[] = $sectionData;
     }
+}
 
     // ===================================
     // MEDIA GALLERY (ULTRA-OPTIMIZED)
