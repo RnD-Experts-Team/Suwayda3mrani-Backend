@@ -133,29 +133,43 @@ public function homeFront()
     /**
      * ✅ Optimized hero section builder
      */
-    private function buildHeroSection($homeSections, &$homeData)
-    {
-        if (!$homeSections->has('hero')) return;
-
-        $heroSection = $homeSections->get('hero');
-        $heroContent = $heroSection->getMultilingualContent();
-        
-        $homeData[] = [
-            'id' => "hero-{$heroSection->id}",
-            'type' => 'hero',
-            'sort_order' => $heroSection->sort_order,
-            'content' => [
-                'en' => [
-                    'title' => $heroContent['title']['en'] ?? '',
-                    'image' => $heroContent['imageUrl'] ?? '',
-                ],
-                'ar' => [
-                    'title' => $heroContent['title']['ar'] ?? '',
-                    'image' => $heroContent['imageUrl'] ?? '',
-                ],
-            ],
-        ];
+    private function buildHeroSection($homeSections, array &$homeData): void
+{
+    // Make sure we have a hero section
+    if (!$homeSections->has('hero')) {
+        return;
     }
+
+    $heroSection = $homeSections->get('hero');
+
+    // Pull translations with the correct model method
+    $heroContent = [
+        'en' => $heroSection->getTranslatedContent('en'),
+        'ar' => $heroSection->getTranslatedContent('ar'),
+    ];
+
+    $homeData[] = [
+        'id'         => "hero-{$heroSection->id}",
+        'type'       => 'hero',
+        'sort_order' => $heroSection->sort_order,
+        'content'    => [
+            'en' => [
+                'title' => $heroContent['en']['title']        ?? '',
+                'image' => $heroContent['en']['image']        ?? '',
+                'description' => $heroContent['en']['description'] ?? '',
+                'buttonText'   => $heroContent['en']['buttonText'] ?? '',
+                'buttonVariant'=> $heroContent['en']['buttonVariant'] ?? '',
+            ],
+            'ar' => [
+                'title' => $heroContent['ar']['title']        ?? '',
+                'image' => $heroContent['ar']['image']        ?? '',
+                'description' => $heroContent['ar']['description'] ?? '',
+                'buttonText'   => $heroContent['ar']['buttonText'] ?? '',
+                'buttonVariant'=> $heroContent['ar']['buttonVariant'] ?? '',
+            ],
+        ],
+    ];
+}
 
     /**
      * ✅ Optimized featured media section builder
