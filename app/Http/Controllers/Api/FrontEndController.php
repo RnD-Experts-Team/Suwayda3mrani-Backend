@@ -9,6 +9,7 @@ use App\Models\Media;
 use App\Models\AidOrganization;
 use App\Models\Testimony;
 use App\Models\HomeSection;
+use App\Models\TimelineEvent;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
@@ -227,7 +228,7 @@ class FrontEndController extends Controller
             return;
         }
 
-        $featuredTestimonies = Testimony::select(['id', 'testimony_id', 'title_key', 'description_key', 'background_image_path', 'url_slug', 'survivor_name', 'survivor_age', 'survivor_location', 'date_of_incident'])
+        $featuredTestimonies = Testimony::select(['id', 'testimony_id', 'title_key', 'description_key', 'background_image_path', 'survivor_name', 'survivor_age', 'survivor_location', 'date_of_incident'])
             ->where('is_active', true)
             ->where('is_featured', true)
             ->orderBy('sort_order')
@@ -1083,7 +1084,7 @@ class FrontEndController extends Controller
                             'ar' => $content['description']['ar'] ?? 'لا يوجد وصف متاح'
                         ],
                         'imageUrl' => $content['imageUrl'] ?? null,
-                        'url' => $content['url'] ?? "/story/{$testimony->url_slug}"
+                        'url' => $content['url'] ?? "/story/{$testimony->id}"
                     ];
                 })->toArray();
             }
@@ -1104,7 +1105,7 @@ class FrontEndController extends Controller
                             'ar' => $content['title']['ar'] ?? 'قصة بدون عنوان'
                         ],
                         'imageUrl' => $content['imageUrl'] ?? null,
-                        'url' => $content['url'] ?? "/story/{$testimony->url_slug}"
+                        'url' => $content['url'] ?? "/story/{$testimony->id}"
                     ];
                 })->toArray();
 
@@ -1122,7 +1123,7 @@ class FrontEndController extends Controller
     }
 
     // ===================================
-    // DETAIL PAGES (OPTIMIZED)
+    // DETAIL PAGES (OPTIMIZED & FIXED)
     // ===================================
 
     public function organizationDetailFront($organizationId)
@@ -1205,12 +1206,13 @@ class FrontEndController extends Controller
             foreach ($relatedOrganizations as $relatedOrg) {
                 $relatedContent = $relatedOrg->getMultilingualContent();
                 
+                // ✅ FIXED: Safe array access for backgroundImage
                 $logoUrl = '';
-                if ($relatedOrg->media->count() > 0) {
+                if ($relatedOrg->media->isNotEmpty()) {
                     $firstMedia = $relatedOrg->media->first();
                     $mediaContent = $firstMedia->getMultilingualContent();
                     $logoUrl = $mediaContent['thumbnail'] ?? $mediaContent['url'] ?? '';
-                } elseif ($relatedContent['en']['backgroundImage']) {
+                } elseif (!empty($relatedContent['en']['backgroundImage'] ?? null)) {
                     $logoUrl = $relatedContent['en']['backgroundImage'];
                 }
 
@@ -1287,7 +1289,6 @@ class FrontEndController extends Controller
                 ->active()
                 ->where('id', $testimonyId)
                 ->orWhere('testimony_id', $testimonyId)
-                ->orWhere('url_slug', $testimonyId)
                 ->first();
 
             if (!$testimony) {
@@ -1385,6 +1386,48 @@ class FrontEndController extends Controller
     }
 
     // ===================================
+    // TIMELINE EVENTS (NEW)
+    // ===================================
+
+    /**
+     * Get timeline events for frontend display
+     */
+    public function timelineFront()
+    {
+        return Cache::remember('timeline_frontend_data_v1', self::CACHE_DURATION['medium'], function () {
+            
+            // Get all active timeline events
+            $timelineEvents = TimelineEvent::with(['media'])
+                ->active()
+                ->ordered()
+                ->get();
+
+            // Transform events for both languages
+            $timelineData = [];
+            
+            foreach (['en', 'ar'] as $language) {
+                $timelineData[$language] = [
+                    'title' => $language === 'en' ? 'Timeline of the Crisis' : 'الجدول الزمني للأزمة',
+                    'items' => $timelineEvents->map(function ($event) use ($language) {
+                        $content = $event->getMultilingualContent();
+                        
+                        return [
+                            'title' => $content['title'][$language],
+                            'period' => $event->period,
+                            'description' => $content['description'][$language],
+                            'isHighlighted' => $event->is_highlighted,
+                            'mediaType' => $content['mediaType'] ?: 'image',
+                            'mediaUrl' => $content['mediaUrl'] ?: 'https://images.unsplash.com/photo-1586829135343-132950070391?w=500&h=300&fit=crop'
+                        ];
+                    })->toArray()
+                ];
+            }
+
+            return response()->json($timelineData);
+        });
+    }
+
+    // ===================================
     // OPTIMIZED HELPER METHODS
     // ===================================
 
@@ -1412,42 +1455,4 @@ class FrontEndController extends Controller
 
         return $cache[$key];
     }
-
-    /**
- * Get timeline events for frontend display
- */
-public function timelineFront()
-{
-    return Cache::remember('timeline_frontend_data_v1', self::CACHE_DURATION['medium'], function () {
-        
-        // Get all active timeline events
-        $timelineEvents = TimelineEvent::with(['media'])
-            ->active()
-            ->ordered()
-            ->get();
-
-        // Transform events for both languages
-        $timelineData = [];
-        
-        foreach (['en', 'ar'] as $language) {
-            $timelineData[$language] = [
-                'title' => $language === 'en' ? 'Timeline of the Crisis' : 'الجدول الزمني للأزمة',
-                'items' => $timelineEvents->map(function ($event) use ($language) {
-                    $content = $event->getMultilingualContent();
-                    
-                    return [
-                        'title' => $content['title'][$language],
-                        'period' => $event->period,
-                        'description' => $content['description'][$language],
-                        'isHighlighted' => $event->is_highlighted,
-                        'mediaType' => $content['mediaType'] ?: 'image',
-                        'mediaUrl' => $content['mediaUrl'] ?: 'https://images.unsplash.com/photo-1586829135343-132950070391?w=500&h=300&fit=crop'
-                    ];
-                })->toArray()
-            ];
-        }
-
-        return response()->json($timelineData);
-    });
-}
 }
