@@ -15,7 +15,7 @@ use Illuminate\Support\Facades\Auth;
 
 Route::get('/', function () {
     if (Auth::check()) {
-        return redirect('/admin/header');
+        return redirect('/localizations');
     }
     return redirect()->route('login');
 })->name('home');
