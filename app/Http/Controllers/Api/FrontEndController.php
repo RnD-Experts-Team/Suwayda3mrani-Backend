@@ -1517,4 +1517,153 @@ public function homeFront()
 
         return $cache[$key];
     }
+
+    // Add this new method to your FrontEndController class
+
+/**
+ * Get case detail for frontend display with structured content
+ */
+public function caseDetailFront($caseId)
+{
+    return Cache::remember("case_detail_frontend_data_v2_{$caseId}", self::CACHE_DURATION['medium'], function () use ($caseId) {
+        
+        $case = Cases::with(['details', 'media'])
+            ->active()
+            ->where('id', $caseId)
+            ->orWhere('case_id', $caseId)
+            ->orWhere('url_slug', $caseId)
+            ->first();
+
+        if (!$case) {
+            return response()->json(['error' => 'Case not found'], 404);
+        }
+
+        // Get multilingual content
+        $caseContent = $case->getMultilingualContent();
+        
+        // Build the content structure
+        $structuredContent = $this->buildCaseContentStructure($case, $caseContent);
+        
+        // Get media items (images and videos)
+        $mediaItems = $this->getCaseMediaItems($case);
+
+        // Return the structured data
+        return response()->json([
+            'en' => [
+                'title' => $caseContent['title']['en'] ?? 'Untitled Case',
+                'content' => $structuredContent['en'],
+                'images' => $mediaItems
+            ],
+            'ar' => [
+                'title' => $caseContent['title']['ar'] ?? 'حالة بدون عنوان',
+                'content' => $structuredContent['ar'],
+                'images' => $mediaItems
+            ],
+            'metadata' => [
+                'case_id' => $case->case_id,
+                'type' => $case->type,
+                'incident_date' => $case->incident_date?->format('Y-m-d'),
+                'location' => $case->location,
+                'url_slug' => $case->url_slug
+            ]
+        ]);
+    });
+}
+
+/**
+ * Build structured content from case description and details
+ */
+private function buildCaseContentStructure($case, $caseContent)
+{
+    $content = [
+        'en' => '',
+        'ar' => ''
+    ];
+
+    // Start with the main description
+    foreach (['en', 'ar'] as $lang) {
+        if (!empty($caseContent['description'][$lang])) {
+            $content[$lang] = $caseContent['description'][$lang];
+        }
+
+        // Add case details if available
+        if ($case->details && $case->details->count() > 0) {
+            $detailsText = [];
+            
+            foreach ($case->details as $detail) {
+                $keyTranslations = $this->getTranslationsForKey($detail->key_localization_key);
+                $valueTranslations = $this->getTranslationsForKey($detail->value_localization_key);
+                
+                $key = $keyTranslations[$lang] ?? '';
+                $value = $valueTranslations[$lang] ?? '';
+                
+                if ($key && $value) {
+                    $detailsText[] = "{$key}: {$value}";
+                }
+            }
+            
+            if (!empty($detailsText)) {
+                if (!empty($content[$lang])) {
+                    $content[$lang] .= "\n\n";
+                }
+                
+                $sectionTitle = $lang === 'en' ? "--- Case Details ---" : "--- تفاصيل القضية ---";
+                $content[$lang] .= $sectionTitle . "\n" . implode("\n", $detailsText);
+            }
+        }
+
+        // Add metadata information
+        $metadataText = [];
+        
+        if ($case->incident_date) {
+            $dateLabel = $lang === 'en' ? 'Date of Incident' : 'تاريخ الحادثة';
+            $metadataText[] = "{$dateLabel}: " . $case->incident_date->format('F j, Y');
+        }
+        
+        if ($case->location) {
+            $locationLabel = $lang === 'en' ? 'Location' : 'الموقع';
+            $metadataText[] = "{$locationLabel}: {$case->location}";
+        }
+        
+        $typeLabels = Cases::getCaseTypes();
+        if (isset($typeLabels[$case->type])) {
+            $typeLabel = $lang === 'en' ? 'Case Type' : 'نوع القضية';
+            $metadataText[] = "{$typeLabel}: {$typeLabels[$case->type][$lang]}";
+        }
+        
+        if (!empty($metadataText)) {
+            if (!empty($content[$lang])) {
+                $content[$lang] .= "\n\n";
+            }
+            
+            $sectionTitle = $lang === 'en' ? "--- Case Information ---" : "--- معلومات القضية ---";
+            $content[$lang] .= $sectionTitle . "\n" . implode("\n", $metadataText);
+        }
+
+    }
+
+    return $content;
+}
+
+/**
+ * Get media items (images and videos) for the case
+ */
+private function getCaseMediaItems($case)
+{
+    $mediaItems = [];
+    
+    if ($case->media && $case->media->count() > 0) {
+        foreach ($case->media as $media) {
+            $mediaUrl = $this->getOptimizedMediaUrl($media);
+            
+            if ($mediaUrl) {
+                $mediaItems[] = $mediaUrl;
+            }
+        }
+    }
+    
+    
+    return $mediaItems;
+}
+
 }

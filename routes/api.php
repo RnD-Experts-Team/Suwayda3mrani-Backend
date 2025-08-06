@@ -18,3 +18,4 @@ Route::get('/organization/{organizationId}', [FrontEndController::class, 'organi
 Route::get('/testimony/{testimonyId}', [FrontEndController::class, 'testimonyDetailFront']);
 Route::get('/media-gallery', [FrontEndController::class, 'getMediaItems']);
 Route::get('/timeline', [FrontEndController::class, 'timelineFront']);
+Route::get('/case/{caseId}', [FrontEndController::class, 'caseDetailFront']);
