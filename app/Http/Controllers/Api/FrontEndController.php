@@ -889,7 +889,7 @@ public function homeFront()
                     $content = $case->getMultilingualContent();
                     
                     return [
-                        'id' => $case->id,
+                        'id' => $case->case_id,
                         'title' => $content['title'],
                         'imagePath' => $content['imagePath'],
                         'url' => $content['url'],
@@ -910,164 +910,168 @@ public function homeFront()
     }
 
     public function aidEffortsFront()
-    {
-        return Cache::remember('aid_efforts_frontend_data_v2', self::CACHE_DURATION['medium'], function () {
-            
-            $pageContentKeys = [
-                'aid_efforts_hero_title',
-                'aid_efforts_hero_description', 
-                'aid_efforts_section_title'
-            ];
+{
+    return Cache::remember('aid_efforts_frontend_data_v2', self::CACHE_DURATION['medium'], function () {
+        
+        $pageContentKeys = [
+            'aid_efforts_hero_title',
+            'aid_efforts_hero_description', 
+            'aid_efforts_section_title'
+        ];
 
-            $pageTranslations = Localization::select(['language', 'key', 'value'])
-                ->where('is_active', true)
-                ->where('group', 'aid_efforts')
-                ->whereIn('language', ['en', 'ar'])
-                ->whereIn('key', $pageContentKeys)
-                ->get()
-                ->groupBy('language')
-                ->map(fn($translations) => $translations->pluck('value', 'key')->toArray())
-                ->toArray();
+        $pageTranslations = Localization::select(['language', 'key', 'value'])
+            ->where('is_active', true)
+            ->where('group', 'aid_efforts')
+            ->whereIn('language', ['en', 'ar'])
+            ->whereIn('key', $pageContentKeys)
+            ->get()
+            ->groupBy('language')
+            ->map(fn($translations) => $translations->pluck('value', 'key')->toArray())
+            ->toArray();
 
-            $aidEffortsData = [
-                'pageContent' => [
-                    'heroTitle' => [
-                        'en' => $pageTranslations['en']['aid_efforts_hero_title'] ?? 'Aid Efforts',
-                        'ar' => $pageTranslations['ar']['aid_efforts_hero_title'] ?? 'جهود المساعدة'
+        $aidEffortsData = [
+            'pageContent' => [
+                'heroTitle' => [
+                    'en' => $pageTranslations['en']['aid_efforts_hero_title'] ?? 'Aid Efforts',
+                    'ar' => $pageTranslations['ar']['aid_efforts_hero_title'] ?? 'جهود المساعدة'
+                ],
+                'heroDescription' => [
+                    'en' => $pageTranslations['en']['aid_efforts_hero_description'] ?? 'Explore the organizations and initiatives dedicated to providing aid and support to those affected by the crisis. Learn about their work, impact, and how you can contribute.',
+                    'ar' => $pageTranslations['ar']['aid_efforts_hero_description'] ?? 'استكشف المنظمات والمبادرات المكرسة لتقديم المساعدة والدعم للمتضررين من الأزمة. تعرف على عملهم وتأثيرهم وكيف يمكنك المساهمة.'
+                ],
+                'sectionTitle' => [
+                    'en' => $pageTranslations['en']['aid_efforts_section_title'] ?? 'Aid Efforts',
+                    'ar' => $pageTranslations['ar']['aid_efforts_section_title'] ?? 'جهود المساعدة'
+                ]
+            ],
+            'actionButtons' => [
+                ['text' => ['en' => 'Donate', 'ar' => 'تبرع'], 'url' => '/donate'],
+                ['text' => ['en' => 'Volunteer', 'ar' => 'تطوع'], 'url' => '/volunteer'],
+                ['text' => ['en' => 'Get Involved', 'ar' => 'شارك معنا'], 'url' => '/get-involved']
+            ],
+            'sections' => []
+        ];
+
+        // International Organizations Section
+        $internationalOrgs = AidOrganization::with(['categories'])
+            ->active()
+            ->where('type', 'organizations')
+            ->where('is_featured', true)
+            ->orderBy('sort_order')
+            ->limit(self::PAGINATION_LIMITS['featured'])
+            ->get();
+
+        if ($internationalOrgs->count() > 0) {
+            $orgItems = $internationalOrgs->map(function ($org) {
+                $content = $org->getMultilingualContent();
+                return [
+                    'id' => $org->organization_id, // Added ID
+                    'en' => [
+                        'name' => $content['en']['name'] ?? '',
+                        'description' => $content['en']['description'] ?? '',
+                        'backgroundImage' => $content['en']['backgroundImage'] ?? '',
+                        'url' => $org->website_url ?: ($content['en']['url'] ?? '')
                     ],
-                    'heroDescription' => [
-                        'en' => $pageTranslations['en']['aid_efforts_hero_description'] ?? 'Explore the organizations and initiatives dedicated to providing aid and support to those affected by the crisis. Learn about their work, impact, and how you can contribute.',
-                        'ar' => $pageTranslations['ar']['aid_efforts_hero_description'] ?? 'استكشف المنظمات والمبادرات المكرسة لتقديم المساعدة والدعم للمتضررين من الأزمة. تعرف على عملهم وتأثيرهم وكيف يمكنك المساهمة.'
-                    ],
-                    'sectionTitle' => [
-                        'en' => $pageTranslations['en']['aid_efforts_section_title'] ?? 'Aid Efforts',
-                        'ar' => $pageTranslations['ar']['aid_efforts_section_title'] ?? 'جهود المساعدة'
+                    'ar' => [
+                        'name' => $content['ar']['name'] ?? '',
+                        'description' => $content['ar']['description'] ?? '', 
+                        'backgroundImage' => $content['ar']['backgroundImage'] ?? '',
+                        'url' => $org->website_url ?: ($content['ar']['url'] ?? '')
                     ]
+                ];
+            })->toArray();
+
+            $aidEffortsData['sections'][] = [
+                'id' => 'international-organizations',
+                'title' => [
+                    'en' => 'International Organizations',
+                    'ar' => 'المنظمات الدولية'
                 ],
-                'actionButtons' => [
-                    ['text' => ['en' => 'Donate', 'ar' => 'تبرع'], 'url' => '/donate'],
-                    ['text' => ['en' => 'Volunteer', 'ar' => 'تطوع'], 'url' => '/volunteer'],
-                    ['text' => ['en' => 'Get Involved', 'ar' => 'شارك معنا'], 'url' => '/get-involved']
-                ],
-                'sections' => []
+                'type' => 'organizations',
+                'items' => $orgItems
             ];
+        }
 
-            // International Organizations Section
-            $internationalOrgs = AidOrganization::with(['categories'])
-                ->active()
-                ->where('type', 'organizations')
-                ->where('is_featured', true)
-                ->orderBy('sort_order')
-                ->limit(self::PAGINATION_LIMITS['featured'])
-                ->get();
+        // Local Groups Section (Initiatives)  
+        $localGroups = AidOrganization::with(['categories'])
+            ->active()
+            ->where('type', 'initiatives')
+            ->where('is_featured', true) 
+            ->orderBy('sort_order')
+            ->limit(self::PAGINATION_LIMITS['featured'])
+            ->get();
 
-            if ($internationalOrgs->count() > 0) {
-                $orgItems = $internationalOrgs->map(function ($org) {
-                    $content = $org->getMultilingualContent();
-                    return [
-                        'en' => [
-                            'name' => $content['en']['name'] ?? '',
-                            'description' => $content['en']['description'] ?? '',
-                            'backgroundImage' => $content['en']['backgroundImage'] ?? '',
-                            'url' => $org->website_url ?: ($content['en']['url'] ?? '')
-                        ],
-                        'ar' => [
-                            'name' => $content['ar']['name'] ?? '',
-                            'description' => $content['ar']['description'] ?? '', 
-                            'backgroundImage' => $content['ar']['backgroundImage'] ?? '',
-                            'url' => $org->website_url ?: ($content['ar']['url'] ?? '')
-                        ]
-                    ];
-                })->toArray();
-
-                $aidEffortsData['sections'][] = [
-                    'id' => 'international-organizations',
-                    'title' => [
-                        'en' => 'International Organizations',
-                        'ar' => 'المنظمات الدولية'
+        if ($localGroups->count() > 0) {
+            $initiativeItems = $localGroups->map(function ($initiative) {
+                $content = $initiative->getMultilingualContent();
+                return [
+                    'id' => $initiative->organization_id, // Added ID
+                    'en' => [
+                        'title' => $content['en']['name'] ?? '',
+                        'description' => $content['en']['description'] ?? '',
+                        'url' => $initiative->website_url ?: ($content['en']['url'] ?? '')
                     ],
-                    'type' => 'organizations',
-                    'items' => $orgItems
+                    'ar' => [
+                        'title' => $content['ar']['name'] ?? '', 
+                        'description' => $content['ar']['description'] ?? '',
+                        'url' => $initiative->website_url ?: ($content['ar']['url'] ?? '')
+                    ]
                 ];
-            }
+            })->toArray();
 
-            // Local Groups Section (Initiatives)  
-            $localGroups = AidOrganization::with(['categories'])
-                ->active()
-                ->where('type', 'initiatives')
-                ->where('is_featured', true) 
-                ->orderBy('sort_order')
-                ->limit(self::PAGINATION_LIMITS['featured'])
-                ->get();
+            $aidEffortsData['sections'][] = [
+                'id' => 'local-groups',
+                'title' => [
+                    'en' => 'Local Groups',
+                    'ar' => 'المجموعات المحلية'
+                ],
+                'type' => 'initiatives',
+                'items' => $initiativeItems
+            ];
+        }
 
-            if ($localGroups->count() > 0) {
-                $initiativeItems = $localGroups->map(function ($initiative) {
-                    $content = $initiative->getMultilingualContent();
-                    return [
-                        'en' => [
-                            'title' => $content['en']['name'] ?? '',
-                            'description' => $content['en']['description'] ?? '',
-                            'url' => $initiative->website_url ?: ($content['en']['url'] ?? '')
-                        ],
-                        'ar' => [
-                            'title' => $content['ar']['name'] ?? '', 
-                            'description' => $content['ar']['description'] ?? '',
-                            'url' => $initiative->website_url ?: ($content['ar']['url'] ?? '')
-                        ]
-                    ];
-                })->toArray();
+        // Stories of Hope Section
+        $storiesOfHope = Story::active()
+            ->featured()
+            ->orderBy('sort_order')
+            ->limit(self::PAGINATION_LIMITS['featured'])
+            ->get();
 
-                $aidEffortsData['sections'][] = [
-                    'id' => 'local-groups',
-                    'title' => [
-                        'en' => 'Local Groups',
-                        'ar' => 'المجموعات المحلية'
+        if ($storiesOfHope->count() > 0) {
+            $storyItems = $storiesOfHope->map(function ($story) {
+                $content = $story->getMultilingualContent();
+                return [
+                    'id' => $story->story_id, // Added ID
+                    'en' => [
+                        'name' => $content['title']['en'] ?? '',
+                        'description' => $content['description']['en'] ?? '',
+                        'backgroundImage' => $content['backgroundImage'] ?? '',
+                        'url' => $content['url'] ?? ''
                     ],
-                    'type' => 'initiatives',
-                    'items' => $initiativeItems
+                    'ar' => [
+                        'name' => $content['title']['ar'] ?? '',
+                        'description' => $content['description']['ar'] ?? '',
+                        'backgroundImage' => $content['backgroundImage'] ?? '',
+                        'url' => $content['url'] ?? ''
+                    ]
                 ];
-            }
+            })->toArray();
 
-            // Stories of Hope Section
-            $storiesOfHope = Story::active()
-                ->featured()
-                ->orderBy('sort_order')
-                ->limit(self::PAGINATION_LIMITS['featured'])
-                ->get();
+            $aidEffortsData['sections'][] = [
+                'id' => 'stories-of-hope',
+                'title' => [
+                    'en' => 'Stories of Hope',
+                    'ar' => 'قصص الأمل'
+                ],
+                'type' => 'organizations',
+                'items' => $storyItems
+            ];
+        }
 
-            if ($storiesOfHope->count() > 0) {
-                $storyItems = $storiesOfHope->map(function ($story) {
-                    $content = $story->getMultilingualContent();
-                    return [
-                        'en' => [
-                            'name' => $content['title']['en'] ?? '',
-                            'description' => $content['description']['en'] ?? '',
-                            'backgroundImage' => $content['backgroundImage'] ?? '',
-                            'url' => $content['url'] ?? ''
-                        ],
-                        'ar' => [
-                            'name' => $content['title']['ar'] ?? '',
-                            'description' => $content['description']['ar'] ?? '',
-                            'backgroundImage' => $content['backgroundImage'] ?? '',
-                            'url' => $content['url'] ?? ''
-                        ]
-                    ];
-                })->toArray();
+        return response()->json($aidEffortsData);
+    });
+}
 
-                $aidEffortsData['sections'][] = [
-                    'id' => 'stories-of-hope',
-                    'title' => [
-                        'en' => 'Stories of Hope',
-                        'ar' => 'قصص الأمل'
-                    ],
-                    'type' => 'organizations',
-                    'items' => $storyItems
-                ];
-            }
-
-            return response()->json($aidEffortsData);
-        });
-    }
 
     // ===================================
     // TESTIMONIALS & STORIES (OPTIMIZED)

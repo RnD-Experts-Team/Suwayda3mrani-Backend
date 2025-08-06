@@ -72,7 +72,7 @@ public function getMediaItems()
 
     public function getUrl(): string
     {
-        return "/testimonies/{$this->url_slug}";
+        return "/testimony/{$this->testimony_id}";
     }
 
     public function getTranslatedContent(string $language): array
