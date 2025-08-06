@@ -181,7 +181,7 @@ public function homeFront()
             return;
         }
 
-        $featuredMedia = Media::select(['id', 'media_id', 'type', 'title_key', 'description_key', 'file_path', 'google_drive_id', 'external_url', 'thumbnail_path', 'source_url'])
+        $featuredMedia = Media::select(['id', 'media_id', 'type', 'title_key', 'description_key', 'file_path', 'google_drive_id', 'external_url', 'thumbnail_path', 'source_url','source_type'])
             ->where('is_active', true)
             ->where('featured_on_home', true)
             ->orderBy('sort_order')
