@@ -11,8 +11,12 @@ use App\Http\Controllers\CasesController;
 use App\Http\Controllers\StoriesController;
 use App\Http\Controllers\TimelineEventController;
 use App\Http\Controllers\HomeSectionController;
+use Illuminate\Support\Facades\Auth;
 
 Route::get('/', function () {
+    if (Auth::check()) {
+        return redirect('/admin/header');
+    }
     return redirect()->route('login');
 })->name('home');
 
