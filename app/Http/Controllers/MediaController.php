@@ -144,41 +144,49 @@ class MediaController extends Controller
             ->with('success', 'Media created successfully.');
     }
 
-    public function show(Media $media)
-    {
-        $media->load(['testimonies', 'cases']);
-        $media->translated_content = $media->getMultilingualContent();
+public function show(Media $medium)
+{
+    $medium->load(['testimonies', 'cases']);
+    
+    // Transform the single item the same way as in index
+    $medium->translated_content = $medium->getMultilingualContent();
+    
+    return Inertia::render('Media/Show', [
+        'media' => $medium,
+    ]);
+}
 
-        return Inertia::render('Media/Show', [
-            'media' => $media,
-        ]);
-    }
 
-    public function edit(Media $media)
-    {
-        // Get current translations
-        $translations = [];
-        foreach (['en', 'ar'] as $lang) {
-            if ($media->title_key) {
-                $translations["title_{$lang}"] = Localization::where('key', $media->title_key)
-                    ->where('language', $lang)
-                    ->value('value') ?? '';
-            }
-
-            if ($media->description_key) {
-                $translations["description_{$lang}"] = Localization::where('key', $media->description_key)
-                    ->where('language', $lang)
-                    ->value('value') ?? '';
-            }
+    public function edit(Media $medium)
+{
+    // Get current translations
+    $translations = [];
+    foreach (['en', 'ar'] as $lang) {
+        if ($medium->title_key) {
+            $translations["title_{$lang}"] = Localization::where('key', $medium->title_key)
+                ->where('language', $lang)
+                ->value('value') ?? '';
         }
 
-        return Inertia::render('Media/Edit', [
-            'media' => $media,
-            'translations' => $translations,
-        ]);
+        if ($medium->description_key) {
+            $translations["description_{$lang}"] = Localization::where('key', $medium->description_key)
+                ->where('language', $lang)
+                ->value('value') ?? '';
+        }
     }
 
-    public function update(Request $request, Media $media)
+    // Create a proper array representation like in index
+    $mediaData = $medium->toArray();
+    $mediaData['translated_content'] = $medium->getMultilingualContent();
+
+    return Inertia::render('Media/Edit', [
+        'media' => $mediaData,
+        'translations' => $translations,
+    ]);
+}
+
+
+    public function update(Request $request, Media $medium)
     {
         $request->validate([
             'type' => 'required|in:image,video',
@@ -210,14 +218,14 @@ class MediaController extends Controller
         // Handle new file upload
         if ($request->source_type === 'upload' && $request->hasFile('file')) {
             // Delete old file
-            if ($media->file_path) {
-                Storage::disk('public')->delete($media->file_path);
+            if ($medium->file_path) {
+                Storage::disk('public')->delete($medium->file_path);
             }
             $updateData['file_path'] = $request->file('file')->store('media', 'public');
         } elseif ($request->source_type !== 'upload') {
             // Clear file path if switching away from upload
-            if ($media->file_path) {
-                Storage::disk('public')->delete($media->file_path);
+            if ($medium->file_path) {
+                Storage::disk('public')->delete($medium->file_path);
                 $updateData['file_path'] = null;
             }
         }
@@ -225,22 +233,22 @@ class MediaController extends Controller
         // Handle thumbnail upload
         if ($request->hasFile('thumbnail')) {
             // Delete old thumbnail
-            if ($media->thumbnail_path) {
-                Storage::disk('public')->delete($media->thumbnail_path);
+            if ($medium->thumbnail_path) {
+                Storage::disk('public')->delete($medium->thumbnail_path);
             }
             $updateData['thumbnail_path'] = $request->file('thumbnail')->store('media/thumbnails', 'public');
         }
 
         // Update media record
-        $media->update($updateData);
+        $medium->update($updateData);
 
         // Update localizations
         foreach (['en', 'ar'] as $lang) {
             // Update title
-            if ($media->title_key) {
+            if ($medium->title_key) {
                 Localization::updateOrCreate(
                     [
-                        'key' => $media->title_key,
+                        'key' => $medium->title_key,
                         'language' => $lang,
                     ],
                     [
@@ -252,10 +260,10 @@ class MediaController extends Controller
             }
 
             // Update description
-            if ($media->description_key && $request->input("description_{$lang}")) {
+            if ($medium->description_key && $request->input("description_{$lang}")) {
                 Localization::updateOrCreate(
                     [
-                        'key' => $media->description_key,
+                        'key' => $medium->description_key,
                         'language' => $lang,
                     ],
                     [
@@ -275,26 +283,26 @@ class MediaController extends Controller
             ->with('success', 'Media updated successfully.');
     }
 
-    public function destroy(Media $media)
+    public function destroy(Media $medium)
     {
         // Delete files
-        if ($media->file_path) {
-            Storage::disk('public')->delete($media->file_path);
+        if ($medium->file_path) {
+            Storage::disk('public')->delete($medium->file_path);
         }
-        if ($media->thumbnail_path) {
-            Storage::disk('public')->delete($media->thumbnail_path);
+        if ($medium->thumbnail_path) {
+            Storage::disk('public')->delete($medium->thumbnail_path);
         }
 
         // Delete related localizations
-        if ($media->title_key) {
-            Localization::where('key', $media->title_key)->delete();
+        if ($medium->title_key) {
+            Localization::where('key', $medium->title_key)->delete();
         }
-        if ($media->description_key) {
-            Localization::where('key', $media->description_key)->delete();
+        if ($medium->description_key) {
+            Localization::where('key', $medium->description_key)->delete();
         }
 
         // Delete media record
-        $media->delete();
+        $medium->delete();
 
         // Clear cache
         \Cache::forget('frontend_grouped_translations');
@@ -341,10 +349,10 @@ class MediaController extends Controller
             ->with('success', count($request->ids) . ' media items deleted successfully.');
     }
 
-    public function toggleFeatured(Media $media)
+    public function toggleFeatured(Media $medium)
     {
-        $media->update([
-            'featured_on_home' => !$media->featured_on_home
+        $medium->update([
+            'featured_on_home' => !$medium->featured_on_home
         ]);
 
         return back()->with('success', 'Featured status updated.');

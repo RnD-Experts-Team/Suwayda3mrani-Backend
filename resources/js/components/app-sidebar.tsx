@@ -19,6 +19,11 @@ const mainNavItems: NavItem[] = [
         icon: LayoutGrid,
     },
     {
+        title: 'Home Sections',
+        href: '/home-sections',
+        icon: LayoutGrid,
+    },
+    {
         title: 'Media',
         href: '/media',
         icon: LayoutGrid,

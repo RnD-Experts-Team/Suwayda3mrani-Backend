@@ -166,7 +166,7 @@ public function aidOrganizations()
         return $content;
     }
 
-    private function getTranslation(string $key, string $language): string
+    public function getTranslation(string $key, string $language): string
     {
         return \App\Models\Localization::where('key', $key)
             ->where('language', $language)

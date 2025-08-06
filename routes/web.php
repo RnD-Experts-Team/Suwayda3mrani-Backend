@@ -10,6 +10,7 @@ use App\Http\Controllers\AidOrganizationController;
 use App\Http\Controllers\CasesController;
 use App\Http\Controllers\StoriesController;
 use App\Http\Controllers\TimelineEventController;
+use App\Http\Controllers\HomeSectionController;
 
 Route::get('/', function () {
     return Inertia::render('welcome');
@@ -42,6 +43,8 @@ Route::middleware(['auth'])->group(function () {
     Route::resource('timeline-events', TimelineEventController::class);
     Route::post('timeline-events/bulk-delete', [TimelineEventController::class, 'bulkDelete'])->name('timeline-events.bulk-delete');
     Route::patch('timeline-events/{timelineEvent}/toggle-highlighted', [TimelineEventController::class, 'toggleHighlighted'])->name('timeline-events.toggle-highlighted');
+    Route::resource('home-sections', HomeSectionController::class);
+    Route::post('/home-sections/bulk-delete', [HomeSectionController::class, 'bulkDelete'])->name('home-sections.bulk-delete');
 });
 
 require __DIR__.'/settings.php';

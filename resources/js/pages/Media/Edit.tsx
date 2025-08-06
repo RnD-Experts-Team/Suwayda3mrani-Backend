@@ -45,27 +45,49 @@ interface Props {
 }
 
 export default function MediaEdit({ media, translations }: Props) {
+    // Create safe media object with fallbacks
+    const safeMedia = {
+        ...media,
+        type: media.type || 'image',
+        source_type: media.source_type || 'upload',
+        is_active: media.is_active ?? true,
+        featured_on_home: media.featured_on_home ?? false,
+        sort_order: media.sort_order ?? 0,
+        media_id: media.media_id || '',
+        google_drive_id: media.google_drive_id || '',
+        external_url: media.external_url || '',
+        source_url: media.source_url || ''
+    };
+
+    // Safe translations with fallbacks
+    const safeTranslations = {
+        title_en: translations?.title_en || '',
+        title_ar: translations?.title_ar || '',
+        description_en: translations?.description_en || '',
+        description_ar: translations?.description_ar || ''
+    };
+
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Dashboard', href: '/dashboard' },
         { title: 'Media', href: '/media' },
-        { title: 'Edit', href: `/media/${media.id}/edit` },
+        { title: 'Edit', href: `/media/${safeMedia.id}/edit` },
     ];
 
     const { data, setData, post, processing, errors } = useForm({
         _method: 'PUT',
-        type: media.type,
-        source_type: media.source_type,
+        type: safeMedia.type,
+        source_type: safeMedia.source_type,
         file: null as File | null,
-        google_drive_id: media.google_drive_id || '',
-        external_url: media.external_url || '',
+        google_drive_id: safeMedia.google_drive_id,
+        external_url: safeMedia.external_url,
         thumbnail: null as File | null,
-        title_en: translations.title_en || '',
-        title_ar: translations.title_ar || '',
-        description_en: translations.description_en || '',
-        description_ar: translations.description_ar || '',
-        source_url: media.source_url || '',
-        featured_on_home: media.featured_on_home,
-        is_active: media.is_active,
+        title_en: safeTranslations.title_en,
+        title_ar: safeTranslations.title_ar,
+        description_en: safeTranslations.description_en,
+        description_ar: safeTranslations.description_ar,
+        source_url: safeMedia.source_url,
+        featured_on_home: safeMedia.featured_on_home,
+        is_active: safeMedia.is_active,
     });
 
     const [filePreview, setFilePreview] = useState<string | null>(null);
@@ -73,18 +95,18 @@ export default function MediaEdit({ media, translations }: Props) {
 
     useEffect(() => {
         // Set initial previews
-        if (media.file_path) {
-            setFilePreview(`/storage/${media.file_path}`);
-        } else if (media.source_type === 'google_drive' && media.google_drive_id) {
-            setFilePreview(`https://drive.google.com/uc?id=${media.google_drive_id}`);
-        } else if (media.external_url) {
-            setFilePreview(media.external_url);
+        if (safeMedia.file_path) {
+            setFilePreview(`/storage/${safeMedia.file_path}`);
+        } else if (safeMedia.source_type === 'google_drive' && safeMedia.google_drive_id) {
+            setFilePreview(`https://drive.google.com/uc?id=${safeMedia.google_drive_id}`);
+        } else if (safeMedia.external_url) {
+            setFilePreview(safeMedia.external_url);
         }
 
-        if (media.thumbnail_path) {
-            setThumbnailPreview(`/storage/${media.thumbnail_path}`);
+        if (safeMedia.thumbnail_path) {
+            setThumbnailPreview(`/storage/${safeMedia.thumbnail_path}`);
         }
-    }, [media]);
+    }, [safeMedia]);
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -114,7 +136,7 @@ export default function MediaEdit({ media, translations }: Props) {
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        post(`/media/${media.id}`);
+        post(`/media/${safeMedia.id}`);
     };
 
     const getSourceIcon = (sourceType: string) => {
@@ -126,9 +148,13 @@ export default function MediaEdit({ media, translations }: Props) {
         }
     };
 
+    const getSourceTypeDisplay = (sourceType: string) => {
+        return sourceType.replace('_', ' ');
+    };
+
     const getCurrentMediaUrl = () => {
-        if (media.file_path) return `/storage/${media.file_path}`;
-        if (media.source_type === 'google_drive' && data.google_drive_id) {
+        if (safeMedia.file_path) return `/storage/${safeMedia.file_path}`;
+        if (safeMedia.source_type === 'google_drive' && data.google_drive_id) {
             return `https://drive.google.com/uc?id=${data.google_drive_id}`;
         }
         if (data.external_url) return data.external_url;
@@ -137,7 +163,7 @@ export default function MediaEdit({ media, translations }: Props) {
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title={`Edit Media - ${translations.title_en || 'Untitled'}`} />
+            <Head title={`Edit Media - ${safeTranslations.title_en || 'Untitled'}`} />
             
             <div className="flex h-full flex-1 flex-col gap-4 rounded-xl p-4 overflow-x-auto">
                 <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-center">
@@ -149,14 +175,14 @@ export default function MediaEdit({ media, translations }: Props) {
                     </div>
                     <div className="flex gap-2">
                         <Badge variant="outline" className="gap-1">
-                            {media.type === 'video' ? <Video className="w-3 h-3" /> : <Image className="w-3 h-3" />}
-                            {media.type}
+                            {safeMedia.type === 'video' ? <Video className="w-3 h-3" /> : <Image className="w-3 h-3" />}
+                            {safeMedia.type}
                         </Badge>
                         <Badge variant="secondary" className="gap-1">
-                            {getSourceIcon(media.source_type)}
-                            {media.source_type.replace('_', ' ')}
+                            {getSourceIcon(safeMedia.source_type)}
+                            {getSourceTypeDisplay(safeMedia.source_type)}
                         </Badge>
-                        {media.featured_on_home && (
+                        {safeMedia.featured_on_home && (
                             <Badge variant="default">Featured</Badge>
                         )}
                     </div>
@@ -215,7 +241,7 @@ export default function MediaEdit({ media, translations }: Props) {
                                                     <div className="flex flex-col items-center gap-2 text-center">
                                                         {getSourceIcon(sourceType)}
                                                         <div className="font-medium text-sm capitalize">
-                                                            {sourceType.replace('_', ' ')}
+                                                            {getSourceTypeDisplay(sourceType)}
                                                         </div>
                                                     </div>
                                                 </button>
@@ -240,8 +266,8 @@ export default function MediaEdit({ media, translations }: Props) {
                                                     </div>
                                                     <div className="flex-1">
                                                         <p className="text-sm font-medium">
-                                                            {media.source_type === 'upload' ? 'Uploaded file' : 
-                                                             media.source_type === 'google_drive' ? 'Google Drive file' : 
+                                                            {safeMedia.source_type === 'upload' ? 'Uploaded file' : 
+                                                             safeMedia.source_type === 'google_drive' ? 'Google Drive file' : 
                                                              'External link'}
                                                         </p>
                                                         <p className="text-xs text-muted-foreground truncate">
@@ -573,7 +599,7 @@ export default function MediaEdit({ media, translations }: Props) {
                                         </div>
                                         <div className="flex justify-between text-xs">
                                             <span className="text-muted-foreground">Source:</span>
-                                            <span className="capitalize">{data.source_type.replace('_', ' ')}</span>
+                                            <span className="capitalize">{getSourceTypeDisplay(data.source_type)}</span>
                                         </div>
                                         <div className="flex justify-between text-xs">
                                             <span className="text-muted-foreground">Featured:</span>
@@ -597,15 +623,15 @@ export default function MediaEdit({ media, translations }: Props) {
                                 <div className="space-y-3 text-sm">
                                     <div className="flex justify-between">
                                         <span className="text-muted-foreground">ID:</span>
-                                        <span className="font-mono">{media.media_id}</span>
+                                        <span className="font-mono">{safeMedia.media_id}</span>
                                     </div>
                                     <div className="flex justify-between">
                                         <span className="text-muted-foreground">Created:</span>
-                                        <span>{new Date(media.created_at).toLocaleDateString()}</span>
+                                        <span>{safeMedia.created_at ? new Date(safeMedia.created_at).toLocaleDateString() : 'N/A'}</span>
                                     </div>
                                     <div className="flex justify-between">
                                         <span className="text-muted-foreground">Updated:</span>
-                                        <span>{new Date(media.updated_at).toLocaleDateString()}</span>
+                                        <span>{safeMedia.updated_at ? new Date(safeMedia.updated_at).toLocaleDateString() : 'N/A'}</span>
                                     </div>
                                 </div>
                             </CardContent>

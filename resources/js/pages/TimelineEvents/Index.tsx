@@ -38,19 +38,28 @@ interface TimelineEvent {
   updated_at: string;
 }
 
+interface PaginationLink {
+  url: string | null;
+  label: string;
+  active: boolean;
+}
+
 interface Props {
-  timelineEvents: {
+  timelineEvents?: {
+    current_page: number;
+    last_page: number;
+    per_page: number;
+    total: number;
+    from: number | null;
+    to: number | null;
     data: TimelineEvent[];
-    links: any[];
-    meta: {
-      current_page: number;
-      last_page: number;
-      total: number;
-      per_page: number;
-      from: number | null;
-      to: number | null;
-    };
-  };
+    links: PaginationLink[];
+    first_page_url: string;
+    last_page_url: string;
+    next_page_url: string | null;
+    prev_page_url: string | null;
+    path: string;
+  } | null;
 }
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -58,15 +67,31 @@ const breadcrumbs: BreadcrumbItem[] = [
   { title: 'Timeline Events', href: '/timeline-events' },
 ];
 
-export default function TimelineEventsIndex({ timelineEvents }: Props) {
+export default function TimelineEventsIndex(props: Props) {
+  const { timelineEvents = null } = props || {};
+
+  // Create safe data objects
+  const safeTimelineEvents = {
+    data: timelineEvents?.data || [],
+    links: timelineEvents?.links || [],
+    meta: {
+      current_page: timelineEvents?.current_page || 1,
+      last_page: timelineEvents?.last_page || 1,
+      per_page: timelineEvents?.per_page || 12,
+      total: timelineEvents?.total || 0,
+      from: timelineEvents?.from || null,
+      to: timelineEvents?.to || null,
+    }
+  };
+
   const [selectedItems, setSelectedItems] = useState<number[]>([]);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<number | null>(null);
 
   const handleSelectAll = (checked: boolean) => {
-    if (checked && timelineEvents.data.length > 0) {
-      setSelectedItems(timelineEvents.data.map(item => item.id));
+    if (checked && safeTimelineEvents.data.length > 0) {
+      setSelectedItems(safeTimelineEvents.data.map(item => item.id));
     } else {
       setSelectedItems([]);
     }
@@ -112,10 +137,25 @@ export default function TimelineEventsIndex({ timelineEvents }: Props) {
     });
   };
 
-  const isEmpty = timelineEvents.meta.total === 0;
-  const totalResults = timelineEvents.meta.total;
-  const fromResult = timelineEvents.meta.from;
-  const toResult = timelineEvents.meta.to;
+  // Safe calculations
+  const hasData = safeTimelineEvents.data.length > 0;
+  const isEmpty = safeTimelineEvents.meta.total === 0;
+  const totalResults = safeTimelineEvents.meta.total;
+  const fromResult = safeTimelineEvents.meta.from;
+  const toResult = safeTimelineEvents.meta.to;
+
+  // Helper function to render results info
+  const renderResultsInfo = () => {
+    if (isEmpty) {
+      return "No timeline events found. Create your first timeline event to get started.";
+    } else if (fromResult && toResult) {
+      return `Showing ${fromResult} to ${toResult} of ${totalResults} results`;
+    } else if (totalResults > 0) {
+      return `${totalResults} timeline event${totalResults !== 1 ? 's' : ''}`;
+    } else {
+      return "Loading timeline events...";
+    }
+  };
 
   const EmptyState = () => (
     <Card className="overflow-hidden">
@@ -153,10 +193,7 @@ export default function TimelineEventsIndex({ timelineEvents }: Props) {
           <div className="space-y-1">
             <h1 className="text-2xl font-bold tracking-tight">Timeline Events</h1>
             <p className="text-sm text-muted-foreground">
-              {isEmpty ? "No timeline events found. Create your first timeline event to get started." : 
-               fromResult && toResult ? `Showing ${fromResult} to ${toResult} of ${totalResults} results` : 
-               `${totalResults} timeline event${totalResults !== 1 ? 's' : ''}`
-              }
+              {renderResultsInfo()}
             </p>
           </div>
           <div className="flex gap-2">
@@ -187,11 +224,11 @@ export default function TimelineEventsIndex({ timelineEvents }: Props) {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Checkbox
-                        checked={selectedItems.length === timelineEvents.data.length && timelineEvents.data.length > 0}
+                        checked={selectedItems.length === safeTimelineEvents.data.length && safeTimelineEvents.data.length > 0}
                         onCheckedChange={handleSelectAll}
                       />
                       <span className="text-sm text-muted-foreground">
-                        {selectedItems.length} of {timelineEvents.data.length} selected
+                        {selectedItems.length} of {safeTimelineEvents.data.length} selected
                       </span>
                     </div>
                     <Button variant="destructive" size="sm" onClick={handleBulkDelete} className="gap-2">
@@ -205,7 +242,7 @@ export default function TimelineEventsIndex({ timelineEvents }: Props) {
 
             {/* Timeline Events Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {timelineEvents.data.map((timelineEvent) => (
+              {safeTimelineEvents.data.map((timelineEvent) => (
                 <Card key={timelineEvent.id} className="overflow-hidden group">
                   <div className="relative">
                     {/* Selection Checkbox */}
@@ -230,7 +267,7 @@ export default function TimelineEventsIndex({ timelineEvents }: Props) {
 
                     {/* Media Preview */}
                     <div className="aspect-[4/3] bg-muted flex items-center justify-center">
-                      {timelineEvent.translated_content.mediaUrl ? (
+                      {timelineEvent.translated_content?.mediaUrl ? (
                         timelineEvent.translated_content.mediaType === 'video' ? (
                           <video 
                             src={timelineEvent.translated_content.mediaUrl} 
@@ -240,7 +277,7 @@ export default function TimelineEventsIndex({ timelineEvents }: Props) {
                         ) : (
                           <img
                             src={timelineEvent.translated_content.mediaUrl}
-                            alt={timelineEvent.translated_content.title.en}
+                            alt={timelineEvent.translated_content?.title?.en || 'Timeline event'}
                             className="w-full h-full object-cover"
                           />
                         )
@@ -256,7 +293,7 @@ export default function TimelineEventsIndex({ timelineEvents }: Props) {
                     <div className="absolute bottom-3 left-3">
                       <Badge variant="secondary" className="text-xs">
                         <Calendar className="w-3 h-3 mr-1" />
-                        {timelineEvent.period}
+                        {timelineEvent.period || 'No period'}
                       </Badge>
                     </div>
                   </div>
@@ -265,18 +302,18 @@ export default function TimelineEventsIndex({ timelineEvents }: Props) {
                     <div className="space-y-3">
                       {/* Title */}
                       <h3 className="font-semibold text-sm line-clamp-2">
-                        {timelineEvent.translated_content.title.en || 'Untitled Timeline Event'}
+                        {timelineEvent.translated_content?.title?.en || 'Untitled Timeline Event'}
                       </h3>
 
                       {/* Description */}
                       <p className="text-xs text-muted-foreground line-clamp-3">
-                        {timelineEvent.translated_content.description.en || 'No description'}
+                        {timelineEvent.translated_content?.description?.en || 'No description'}
                       </p>
 
                       {/* Event Info */}
                       <div className="space-y-1">
                         <div className="text-xs text-muted-foreground">
-                          ID: {timelineEvent.timeline_event_id}
+                          ID: {timelineEvent.timeline_event_id || 'Unknown'}
                         </div>
                         {timelineEvent.media_count > 0 && (
                           <div className="text-xs text-muted-foreground">
@@ -284,7 +321,7 @@ export default function TimelineEventsIndex({ timelineEvents }: Props) {
                           </div>
                         )}
                         <div className="text-xs text-muted-foreground">
-                          Order: {timelineEvent.sort_order}
+                          Order: {timelineEvent.sort_order ?? 0}
                         </div>
                       </div>
 
@@ -331,11 +368,11 @@ export default function TimelineEventsIndex({ timelineEvents }: Props) {
             </div>
 
             {/* Pagination */}
-            {timelineEvents.meta.last_page > 1 && (
+            {safeTimelineEvents.meta.last_page > 1 && (
               <div className="flex justify-center">
                 <Pagination>
                   <PaginationContent>
-                    {timelineEvents.links.map((link, index) => (
+                    {safeTimelineEvents.links.map((link, index) => (
                       <PaginationItem key={index}>
                         {link.label === '&laquo; Previous' ? (
                           <PaginationPrevious 
