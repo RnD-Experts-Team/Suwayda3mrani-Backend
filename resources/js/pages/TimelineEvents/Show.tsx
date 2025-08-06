@@ -13,7 +13,6 @@ export default function Show({ timelineEvent }: Props) {
   const { translated_content: t } = timelineEvent;
 
   const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Dashboard', href: '/dashboard' },
     { title: 'Timeline Events', href: '/timeline-events' },
     { title: t.title.en, href: `/timeline-events/${timelineEvent.id}` },
   ];

@@ -60,7 +60,6 @@ interface Props {
 
 export default function MediaShow({ media }: Props) {
     const breadcrumbs: BreadcrumbItem[] = [
-        { title: 'Dashboard', href: '/dashboard' },
         { title: 'Media', href: '/media' },
         { title: media.translated_content?.title?.en || 'View Media', href: `/media/${media.id}` },
     ];

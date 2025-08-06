@@ -14,7 +14,6 @@ import { Upload, Home, Layout, Image } from 'lucide-react';
 import { type BreadcrumbItem } from '@/types';
 
 const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Dashboard', href: '/dashboard' },
     { title: 'Home Sections', href: '/home-sections' },
     { title: 'Create', href: '/home-sections/create' },
 ];

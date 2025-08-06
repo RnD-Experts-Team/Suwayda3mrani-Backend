@@ -48,7 +48,6 @@ interface Props {
 
 export default function StoriesShow({ story, attachedMedia }: Props) {
   const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Dashboard', href: '/dashboard' },
     { title: 'Stories of Hope', href: '/stories' },
     { title: 'View', href: `/stories/${story.id}` },
   ];

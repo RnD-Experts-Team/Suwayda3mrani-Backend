@@ -15,7 +15,6 @@ import { Upload, Image, Video, Database, Link as LinkIcon, AlertCircle } from 'l
 import { type BreadcrumbItem } from '@/types';
 
 const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Dashboard', href: '/dashboard' },
     { title: 'Media', href: '/media' },
     { title: 'Create', href: '/media/create' },
 ];

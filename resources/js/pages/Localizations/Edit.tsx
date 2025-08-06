@@ -32,7 +32,6 @@ interface Props {
 
 export default function EditLocalization({ localization, languages = null, groups = null }: Props) {
     const breadcrumbs: BreadcrumbItem[] = [
-        { title: 'Dashboard', href: '/dashboard' },
         { title: 'Localizations', href: '/localizations' },
         { title: 'Edit', href: `/localizations/${localization.id}/edit` },
     ];

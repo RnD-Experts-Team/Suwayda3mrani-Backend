@@ -40,7 +40,6 @@ interface Props {
 
 export default function HomeSectionEdit({ homeSection, translations }: Props) {
     const breadcrumbs: BreadcrumbItem[] = [
-        { title: 'Dashboard', href: '/dashboard' },
         { title: 'Home Sections', href: '/home-sections' },
         { title: translations.title_en || 'Section', href: `/home-sections/${homeSection.id}` },
         { title: 'Edit', href: `/home-sections/${homeSection.id}/edit` },

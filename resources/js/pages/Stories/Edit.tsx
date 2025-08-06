@@ -57,7 +57,6 @@ export default function StoriesEdit({
   attachedMediaIds 
 }: Props) {
   const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Dashboard', href: '/dashboard' },
     { title: 'Stories of Hope', href: '/stories' },
     { title: 'Edit', href: `/stories/${story.id}/edit` },
   ];

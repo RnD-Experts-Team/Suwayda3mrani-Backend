@@ -54,7 +54,6 @@ interface Props {
 
 export default function TestimonyEdit({ testimony, translations, availableMedia, attachedMedia }: Props) {
     const breadcrumbs: BreadcrumbItem[] = [
-        { title: 'Dashboard', href: '/dashboard' },
         { title: 'Testimonies', href: '/testimonies' },
         { title: 'Edit', href: `/testimonies/${testimony.id}/edit` },
     ];

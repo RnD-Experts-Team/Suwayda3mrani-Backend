@@ -34,7 +34,6 @@ interface Props {
 
 export default function AidCategoryEdit({ category, translations }: Props) {
     const breadcrumbs: BreadcrumbItem[] = [
-        { title: 'Dashboard', href: '/dashboard' },
         { title: 'Aid Organizations', href: '/aid-organizations' },
         { title: 'Categories', href: '/aid-categories' },
         { title: 'Edit', href: `/aid-categories/${category.id}/edit` },

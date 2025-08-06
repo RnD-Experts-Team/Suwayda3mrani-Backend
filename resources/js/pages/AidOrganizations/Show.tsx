@@ -74,7 +74,6 @@ export default function AidOrganizationShow({ organization }: Props) {
     const [currentLanguage, setCurrentLanguage] = useState<'en' | 'ar'>('en');
 
     const breadcrumbs: BreadcrumbItem[] = [
-        { title: 'Dashboard', href: '/dashboard' },
         { title: 'Aid Organizations', href: '/aid-organizations' },
         { title: organization.translated_content.en.name || 'Organization', href: `/aid-organizations/${organization.id}` },
     ];

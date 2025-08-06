@@ -13,14 +13,10 @@ use App\Http\Controllers\TimelineEventController;
 use App\Http\Controllers\HomeSectionController;
 
 Route::get('/', function () {
-    return Inertia::render('welcome');
+    return redirect()->route('login');
 })->name('home');
 
 Route::middleware(['auth'])->group(function () {
-    Route::get('dashboard', function () {
-        return Inertia::render('dashboard');
-    })->name('dashboard');
-
     Route::resource('localizations', LocalizationController::class);
     Route::post('localizations/bulk-delete', [LocalizationController::class, 'bulkDelete'])->name('localizations.bulk-delete');
     Route::resource('media', MediaController::class);

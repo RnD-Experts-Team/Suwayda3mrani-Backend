@@ -54,7 +54,6 @@ interface Props {
 
 export default function CasesShow({ case: caseData, attachedMedia, caseTypes }: Props) {
   const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Dashboard', href: '/dashboard' },
     { title: 'Cases', href: '/cases' },
     { title: 'View', href: `/cases/${caseData.id}` },
   ];

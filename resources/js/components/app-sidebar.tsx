@@ -9,11 +9,6 @@ import AppLogo from './app-logo';
 
 const mainNavItems: NavItem[] = [
     {
-        title: 'Dashboard',
-        href: '/dashboard',
-        icon: LayoutGrid,
-    },
-    {
         title: 'Localizations',
         href: '/localizations',
         icon: LayoutGrid,
@@ -80,7 +75,7 @@ export function AppSidebar() {
                 <SidebarMenu>
                     <SidebarMenuItem>
                         <SidebarMenuButton size="lg" asChild>
-                            <Link href="/dashboard" prefetch>
+                            <Link href="/localizations" prefetch>
                                 <AppLogo />
                             </Link>
                         </SidebarMenuButton>

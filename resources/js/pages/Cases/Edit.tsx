@@ -72,7 +72,6 @@ export default function CasesEdit({
   attachedMediaIds 
 }: Props) {
   const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Dashboard', href: '/dashboard' },
     { title: 'Cases', href: '/cases' },
     { title: 'Edit', href: `/cases/${caseData.id}/edit` },
   ];

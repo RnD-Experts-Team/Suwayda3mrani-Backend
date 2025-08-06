@@ -12,7 +12,6 @@ import { Tag, Hash, Palette } from 'lucide-react';
 import { type BreadcrumbItem } from '@/types';
 
 const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Dashboard', href: '/dashboard' },
     { title: 'Aid Organizations', href: '/aid-organizations' },
     { title: 'Categories', href: '/aid-categories' },
     { title: 'Create', href: '/aid-categories/create' },

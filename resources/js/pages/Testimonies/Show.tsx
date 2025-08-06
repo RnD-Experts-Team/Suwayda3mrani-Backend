@@ -95,7 +95,6 @@ export default function TestimonyShow({ testimony }: Props) {
     };
 
     const breadcrumbs: BreadcrumbItem[] = [
-        { title: 'Dashboard', href: '/dashboard' },
         { title: 'Testimonies', href: '/testimonies' },
         { title: safeTestimony.translated_content.title?.en || 'View Testimony', href: `/testimonies/${safeTestimony.id}` },
     ];

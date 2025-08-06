@@ -50,7 +50,6 @@ interface Props {
 
 export default function TimelineEventEdit({ timelineEvent, mediaItems }: Props) {
   const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Dashboard', href: '/dashboard' },
     { title: 'Timeline Events', href: '/timeline-events' },
     { title: timelineEvent.title.en || 'Timeline Event', href: `/timeline-events/${timelineEvent.id}` },
     { title: 'Edit', href: `/timeline-events/${timelineEvent.id}/edit` },

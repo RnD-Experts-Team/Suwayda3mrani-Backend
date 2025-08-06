@@ -53,7 +53,6 @@ export default function HomeSectionShow({ homeSection }: Props) {
     const [currentLanguage, setCurrentLanguage] = useState<'en' | 'ar'>('en');
 
     const breadcrumbs: BreadcrumbItem[] = [
-        { title: 'Dashboard', href: '/dashboard' },
         { title: 'Home Sections', href: '/home-sections' },
         { title: homeSection.translated_content.title.en || 'Section', href: `/home-sections/${homeSection.id}` },
     ];

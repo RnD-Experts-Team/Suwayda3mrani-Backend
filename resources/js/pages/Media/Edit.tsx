@@ -68,7 +68,6 @@ export default function MediaEdit({ media, translations }: Props) {
     };
 
     const breadcrumbs: BreadcrumbItem[] = [
-        { title: 'Dashboard', href: '/dashboard' },
         { title: 'Media', href: '/media' },
         { title: 'Edit', href: `/media/${safeMedia.id}/edit` },
     ];

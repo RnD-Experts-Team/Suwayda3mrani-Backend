@@ -28,7 +28,6 @@ interface Props {
 }
 
 const breadcrumbs: BreadcrumbItem[] = [
-  { title: 'Dashboard', href: '/dashboard' },
   { title: 'Timeline Events', href: '/timeline-events' },
   { title: 'Create', href: '/timeline-events/create' },
 ];
