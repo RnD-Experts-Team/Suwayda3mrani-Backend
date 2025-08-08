@@ -36,13 +36,22 @@ class FrontEndController extends Controller
         'home_media' => 10
     ];
 
+    private function cacheRemember($key, $ttl, $callback) 
+{
+    if (config('app.disable_cache')) {
+        return $callback();
+    }
+    return Cache::remember($key, $ttl, $callback);
+}
+
+
     // ===================================
     // LAYOUT & NAVIGATION (OPTIMIZED)
     // ===================================
     
     public function layoutFront()
     {
-        return Cache::remember('layout_frontend_data_v3', self::CACHE_DURATION['extended'], function () {
+        return $this->cacheRemember('layout_frontend_data_v3', self::CACHE_DURATION['extended'], function () {
             // Single optimized query with minimal data
             $requiredKeys = [
                 'title', 'home', 'crisesArchive', 'media', 'aidEfforts', 'organizations', 
@@ -86,7 +95,7 @@ class FrontEndController extends Controller
 // ===================================
 public function homeFront()
 {
-    return Cache::remember(
+    return $this->cacheRemember(
         'home_frontend_data_v3',
         self::CACHE_DURATION['medium'],
         function () {
@@ -391,10 +400,10 @@ public function homeFront()
     $mainCacheKey = "media_gallery_v2_{$type}_{$page}_{$limit}";
     $countCacheKey = "media_gallery_count_v2_{$type}";
     
-    return Cache::remember($mainCacheKey, self::CACHE_DURATION['short'], function () use ($offset, $limit, $type, $countCacheKey, $page) {
+    return $this->cacheRemember($mainCacheKey, self::CACHE_DURATION['short'], function () use ($offset, $limit, $type, $countCacheKey, $page) {
         
         // ✅ Get total count from separate cache to avoid expensive COUNT queries
-        $totalItems = Cache::remember($countCacheKey, self::CACHE_DURATION['medium'], function () use ($type) {
+        $totalItems = $this->cacheRemember($countCacheKey, self::CACHE_DURATION['medium'], function () use ($type) {
             $query = Media::where('is_active', true)->where('featured_on_home', true);
             
             if ($type !== 'all') {
@@ -654,7 +663,7 @@ public function homeFront()
 
     public function aboutPageFront()
     {
-        return Cache::remember('about_page_frontend_data_v2', self::CACHE_DURATION['long'], function () {
+        return $this->cacheRemember('about_page_frontend_data_v2', self::CACHE_DURATION['long'], function () {
             $aboutKeys = [
                 'about_section_title', 'about_section_description',
                 'historical_context_title', 'historical_context_description',
@@ -860,7 +869,7 @@ public function homeFront()
 
     public function dataOverviewFront()
     {
-        return Cache::remember('data_overview_frontend_data_v2', self::CACHE_DURATION['medium'], function () {
+        return $this->cacheRemember('data_overview_frontend_data_v2', self::CACHE_DURATION['medium'], function () {
             
             $pageTitleKey = 'data_overview_page_title';
             $pageTitle = $this->getTranslationsForKey($pageTitleKey);
@@ -911,7 +920,7 @@ public function homeFront()
 
     public function aidEffortsFront()
 {
-    return Cache::remember('aid_efforts_frontend_data_v2', self::CACHE_DURATION['medium'], function () {
+    return $this->cacheRemember('aid_efforts_frontend_data_v2', self::CACHE_DURATION['medium'], function () {
         
         $pageContentKeys = [
             'aid_efforts_hero_title',
@@ -1084,7 +1093,7 @@ public function homeFront()
         
         $cacheKey = "testimonials_frontend_data_v2_page_{$page}_per_{$perPage}";
         
-        return Cache::remember($cacheKey, self::CACHE_DURATION['medium'], function () use ($page, $perPage) {
+        return $this->cacheRemember($cacheKey, self::CACHE_DURATION['medium'], function () use ($page, $perPage) {
             
             $pageContentKeys = [
                 'testimonials_page_title',
@@ -1190,7 +1199,7 @@ public function homeFront()
 
     public function organizationDetailFront($organizationId)
     {
-        return Cache::remember("organization_detail_frontend_data_v2_{$organizationId}", self::CACHE_DURATION['medium'], function () use ($organizationId) {
+        return $this->cacheRemember("organization_detail_frontend_data_v2_{$organizationId}", self::CACHE_DURATION['medium'], function () use ($organizationId) {
             
             $currentOrganization = AidOrganization::with(['categories', 'media'])
                 ->active()
@@ -1345,7 +1354,7 @@ public function homeFront()
 
     public function testimonyDetailFront($testimonyId)
     {
-        return Cache::remember("testimony_detail_frontend_data_v2_{$testimonyId}", self::CACHE_DURATION['medium'], function () use ($testimonyId) {
+        return $this->cacheRemember("testimony_detail_frontend_data_v2_{$testimonyId}", self::CACHE_DURATION['medium'], function () use ($testimonyId) {
             
             $testimony = Testimony::with(['media'])
                 ->active()
@@ -1456,7 +1465,7 @@ public function homeFront()
      */
     public function timelineFront()
     {
-        return Cache::remember('timeline_frontend_data_v1', self::CACHE_DURATION['medium'], function () {
+        return $this->cacheRemember('timeline_frontend_data_v1', self::CACHE_DURATION['medium'], function () {
             
             // Get all active timeline events
             $timelineEvents = TimelineEvent::with(['media'])
@@ -1525,7 +1534,7 @@ public function homeFront()
  */
 public function caseDetailFront($caseId)
 {
-    return Cache::remember("case_detail_frontend_data_v2_{$caseId}", self::CACHE_DURATION['medium'], function () use ($caseId) {
+    return $this->cacheRemember("case_detail_frontend_data_v2_{$caseId}", self::CACHE_DURATION['medium'], function () use ($caseId) {
         
         $case = Cases::with(['details', 'media'])
             ->active()
