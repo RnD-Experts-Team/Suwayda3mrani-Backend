@@ -116,8 +116,7 @@ public function homeFront()
                 ])
                 ->where('is_active', true)
                 ->orderBy('sort_order')
-                ->get()
-                ->keyBy('type');
+                ->get();
 
             $this->buildHeroSection($homeSections, $homeData);
             $this->buildFeaturedMediaSection($homeData);
@@ -146,10 +145,12 @@ public function homeFront()
     private function buildHeroSection($homeSections, array &$homeData): void
 {
     // Make sure we have a hero section
-    if (!$homeSections->has('hero')) {
-        return;
-    }
-    $heroSection = $homeSections->get('hero');
+    if (! $homeSections->contains('type', 'hero')) {
+    return;
+}
+
+// 2) Pull out that section
+$heroSection = $homeSections->firstWhere('type', 'hero');
 
     // Pull translations with the correct model method
     $heroContent = [
@@ -313,6 +314,7 @@ public function homeFront()
 {
     // Ignore the hero – everything else is “dynamic”
     $dynamicSections = $homeSections->reject(fn ($s) => $s->type === 'hero');
+
     foreach ($dynamicSections as $section) {
         // Pull translations with the correct model method
         $contentEn = $section->getTranslatedContent('en');
@@ -323,7 +325,6 @@ public function homeFront()
             'type'       => $section->type,
             'sort_order' => $section->sort_order,
         ];
-
         switch ($section->type) {
             // Cards, key events, etc.
             case 'component_node':
@@ -421,8 +422,7 @@ public function homeFront()
             'google_drive_id', 'external_url', 'thumbnail_path', 
             'title_key', 'description_key', 'source_url', 'created_at'
         ])
-        ->where('is_active', true)
-        ->where('featured_on_home', true);
+        ->where('is_active', true);
 
         if ($type !== 'all') {
             $query->where('type', $type);
