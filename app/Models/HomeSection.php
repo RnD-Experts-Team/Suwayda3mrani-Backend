@@ -5,7 +5,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Builder;
-
+use Illuminate\Support\Facades\Storage;
 class HomeSection extends Model
 {
     protected $fillable = [
@@ -45,7 +45,7 @@ class HomeSection extends Model
     // Helper methods
     public function getImageUrl(): ?string
     {
-        return $this->image_path ? \Storage::disk('public')->url($this->image_path) : null;
+        return $this->image_path ? Storage::disk('public')->url($this->image_path) : null;
     }
 
     public function getTranslatedContent(string $language): array
@@ -67,7 +67,7 @@ class HomeSection extends Model
         if ($this->button_variant) {
             $content['buttonVariant'] = $this->button_variant;
         }
-        
+
         if ($this->image_path) {
             $content['image'] = $this->getImageUrl();
         }

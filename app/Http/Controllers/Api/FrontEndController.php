@@ -108,10 +108,8 @@ public function homeFront()
                     'type',
                     'sort_order',
                     'title_key',
-                    'description_key'
-                    // 'background_image_path',   <-- removed
-                    // or use the real one:
-                    // 'background_image',
+                    'description_key',
+                    'image_path',
                 ])
                 ->where('is_active', true)
                 ->orderBy('sort_order')
@@ -148,7 +146,6 @@ public function homeFront()
     if (!$homeSections->has('hero')) {
         return;
     }
-
     $heroSection = $homeSections->get('hero');
 
     // Pull translations with the correct model method
@@ -156,7 +153,6 @@ public function homeFront()
         'en' => $heroSection->getTranslatedContent('en'),
         'ar' => $heroSection->getTranslatedContent('ar'),
     ];
-
     $homeData[] = [
         'id'         => "hero-{$heroSection->id}",
         'type'       => 'hero',
