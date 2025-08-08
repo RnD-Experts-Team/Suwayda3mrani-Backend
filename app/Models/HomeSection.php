@@ -51,7 +51,6 @@ class HomeSection extends Model
     public function getTranslatedContent(string $language): array
     {
         $content = [];
-        
         if ($this->title_key) {
             $content['title'] = $this->getTranslation($this->title_key, $language);
         }
@@ -70,6 +69,10 @@ class HomeSection extends Model
 
         if ($this->image_path) {
             $content['image'] = $this->getImageUrl();
+        }
+
+        if($this->action_key) {
+            $content['action_link'] = $this->action_key;
         }
 
         return $content;

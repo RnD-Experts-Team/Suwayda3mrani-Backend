@@ -110,6 +110,9 @@ public function homeFront()
                     'title_key',
                     'description_key',
                     'image_path',
+                    'button_text_key',
+                    'button_variant',
+                    'action_key',
                 ])
                 ->where('is_active', true)
                 ->orderBy('sort_order')
@@ -310,7 +313,6 @@ public function homeFront()
 {
     // Ignore the hero – everything else is “dynamic”
     $dynamicSections = $homeSections->reject(fn ($s) => $s->type === 'hero');
-
     foreach ($dynamicSections as $section) {
         // Pull translations with the correct model method
         $contentEn = $section->getTranslatedContent('en');
@@ -359,14 +361,13 @@ public function homeFront()
                 break;
 
             // Simple suggestion blocks
-            case 'suggestions':
+            case 'suggestion':
                 $sectionData['content'] = [
                     'en' => $contentEn,
                     'ar' => $contentAr,
                 ];
                 break;
         }
-
         $homeData[] = $sectionData;
     }
 }
@@ -400,7 +401,7 @@ public function homeFront()
         
         // ✅ Get total count from separate cache to avoid expensive COUNT queries
         $totalItems = $this->cacheRemember($countCacheKey, self::CACHE_DURATION['medium'], function () use ($type) {
-            $query = Media::where('is_active', true)->where('featured_on_home', true);
+            $query = Media::where('is_active', true);
             
             if ($type !== 'all') {
                 $query->where('type', $type);
