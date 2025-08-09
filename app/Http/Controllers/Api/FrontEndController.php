@@ -1681,8 +1681,8 @@ private function buildFeaturedCasesSection(&$homeData)
         return;
     }
 
-    $featuredCases = Cases::select([ 'case_id', 'type', 'title_key', 'url_slug'])
-        ->with(['details', 'media']) // ✅ Add 'mediaa' relationship like in dataOverviewFront
+    $featuredCases = Cases::select(['id', 'case_id', 'type', 'title_key', 'url_slug']) // ✅ Added 'id' back
+        ->with(['details', 'media']) // ✅ Changed to 'media' (not 'mediaa')
         ->where('is_active', true)
         ->where('is_featured', true)
         ->orderBy('sort_order')
@@ -1698,9 +1698,9 @@ private function buildFeaturedCasesSection(&$homeData)
             'id' => $case->case_id,
             'type' => $case->type,
             'url_slug' => $case->url_slug,
-            'imagePath' => $content['imagePath'], // ✅ Use the same pattern as dataOverviewFront
-            'title' => $content['title'], // ✅ Also simplified this
-            'details' => $content['details'] // ✅ Use the details from getMultilingualContent()
+            'imagePath' => $content['imagePath'],
+            'title' => $content['title'],
+            'details' => $content['details']
         ];
     })->toArray();
 
@@ -1715,6 +1715,5 @@ private function buildFeaturedCasesSection(&$homeData)
         'content' => $casesContent,
     ];
 }
-
 
 }
