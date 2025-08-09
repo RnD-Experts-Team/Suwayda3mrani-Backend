@@ -122,6 +122,7 @@ public function homeFront()
             $this->buildFeaturedMediaSection($homeData);
             $this->buildFeaturedOrganizationsSection($homeData);
             $this->buildFeaturedTestimoniesSection($homeData);
+            $this->buildFeaturedCasesSection($homeData); 
             $this->buildDynamicSections($homeSections, $homeData);
 
             usort(
@@ -1671,5 +1672,49 @@ private function getCaseMediaItems($case)
     
     return $mediaItems;
 }
+/**
+ * ✅ Optimized featured cases section builder
+ */
+private function buildFeaturedCasesSection(&$homeData)
+{
+    if (!Cases::where('is_active', true)->where('is_featured', true)->exists()) {
+        return;
+    }
+
+    $featuredCases = Cases::select([ 'case_id', 'type', 'title_key', 'url_slug'])
+        ->with(['details', 'media']) // ✅ Add 'mediaa' relationship like in dataOverviewFront
+        ->where('is_active', true)
+        ->where('is_featured', true)
+        ->orderBy('sort_order')
+        ->limit(self::PAGINATION_LIMITS['featured'])
+        ->get();
+
+    if ($featuredCases->isEmpty()) return;
+
+    $casesContent = $featuredCases->map(function ($case) {
+        $content = $case->getMultilingualContent();
+        
+        return [
+            'id' => $case->case_id,
+            'type' => $case->type,
+            'url_slug' => $case->url_slug,
+            'imagePath' => $content['imagePath'], // ✅ Use the same pattern as dataOverviewFront
+            'title' => $content['title'], // ✅ Also simplified this
+            'details' => $content['details'] // ✅ Use the details from getMultilingualContent()
+        ];
+    })->toArray();
+
+    $homeData[] = [
+        'id' => 'featured-cases',
+        'type' => 'featured_cases',
+        'sort_order' => 250,
+        'title' => [
+            'en' => 'Featured Cases',
+            'ar' => 'القضايا المميزة'
+        ],
+        'content' => $casesContent,
+    ];
+}
+
 
 }
