@@ -239,7 +239,7 @@ $heroSection = $homeSections->firstWhere('type', 'hero');
         $organizationContent = $featuredOrganizations->map(function ($org) {
             $content = $org->getMultilingualContent();
             return [
-                'id' => "aid-org-{$org->id}",
+                'id' => $org->organization_id,
                 'type' => $org->type,
                 'website_url' => $org->website_url,
                 'contact_url' => $org->contact_url,
