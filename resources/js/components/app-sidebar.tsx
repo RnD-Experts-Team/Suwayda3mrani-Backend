@@ -52,7 +52,13 @@ const mainNavItems: NavItem[] = [
         title: 'Timeline Events',
         href: '/timeline-events',
         icon: LayoutGrid,
-    }
+    },
+    {
+        title: 'Entries',
+        href: '/entries',
+        icon: LayoutGrid,
+    },
+
 ];
 
 const footerNavItems: NavItem[] = [
