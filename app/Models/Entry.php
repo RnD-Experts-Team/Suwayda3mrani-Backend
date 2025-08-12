@@ -21,14 +21,15 @@ class Entry extends Model
 
     // No casts for string/text fields
 
-    public function host()
+    public function displacedFamilies(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
-        return $this->hasOne(Host::class);
+        return $this->hasMany(DisplacedFamily::class, 'entry_id');
     }
 
-    public function hostedFamilies()
+    // Keep your existing relationships
+    public function host()
     {
-        return $this->hasMany(HostedFamily::class);
+        return $this->belongsTo(Host::class);
     }
 
     public function martyrs()

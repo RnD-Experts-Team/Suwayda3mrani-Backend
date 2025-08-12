@@ -6,24 +6,35 @@ use App\Models\Entry;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
+use Maatwebsite\Excel\Concerns\ShouldAutoSize;
+use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
+use Maatwebsite\Excel\Concerns\WithStyles;
 
-class EntriesSheetExport implements FromCollection, WithHeadings, WithMapping
+class EntriesSheetExport implements FromCollection, WithHeadings, WithMapping, ShouldAutoSize, WithStyles
 {
     public function collection()
     {
-        return Entry::withCount(['hostedFamilies', 'martyrs', 'shelters'])->get();
+        return Entry::with([
+            'host',
+            'displacedFamilies', // Changed from hostedFamilies
+            'martyrs',
+            'shelters.displacedFamilies'
+        ])->get();
     }
 
     public function headings(): array
     {
         return [
-            'ID',
+            'Entry ID',
             'Entry Number',
             'Submitter Name',
             'Location',
             'Status',
             'Date Submitted',
-            'Hosted Families Count',
+            'Host Name',
+            'Host Family Count',
+            'Host Location',
+            'Displaced Families Count',
             'Martyrs Count',
             'Shelters Count',
             'Internal Link',
@@ -35,14 +46,25 @@ class EntriesSheetExport implements FromCollection, WithHeadings, WithMapping
         return [
             $entry->id,
             $entry->entry_number,
-            $entry->submitter_name ?? 'N/A',
-            $entry->location ?? 'N/A',
-            $entry->status ?? 'N/A',
+            $entry->submitter_name,
+            $entry->location,
+            $entry->status,
             $entry->date_submitted,
-            $entry->hosted_families_count,
-            $entry->martyrs_count,
-            $entry->shelters_count,
-            $entry->InternalLink ?? 'N/A',
+            $entry->host->full_name ?? 'N/A',
+            $entry->host->family_count ?? 'N/A',
+            $entry->host->location ?? 'N/A',
+            $entry->displacedFamilies->count(), // Changed from hostedFamilies
+            $entry->martyrs->count(),
+            $entry->shelters->count(),
+            $entry->InternalLink,
+        ];
+    }
+
+    public function styles(Worksheet $sheet)
+    {
+        return [
+            // Style the first row as bold text
+            1 => ['font' => ['bold' => true]],
         ];
     }
 }

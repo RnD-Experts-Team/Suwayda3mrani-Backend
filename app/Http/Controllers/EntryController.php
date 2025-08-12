@@ -46,7 +46,7 @@ class EntryController extends Controller
     {
         $entry = Entry::with([
             'host',
-            'hostedFamilies',
+            'displacedFamilies', // Changed from hostedFamilies
             'martyrs',
             'shelters.displacedFamilies'
         ])->findOrFail($id);

@@ -24,5 +24,4 @@ Route::get('/case/{caseId}', [FrontEndController::class, 'caseDetailFront']);
 
 Route::post('/webhook', [WebhookController::class, 'handle'])->name('webhook.handle');
 
-Route::get('/entries', [ApiController::class, 'getEntries']);
-Route::get('/entries/{id}', [ApiController::class, 'getEntry']);
+

@@ -11,7 +11,6 @@ class EntriesExport implements WithMultipleSheets
         return [
             'Entries' => new EntriesSheetExport(),
             'Hosts' => new HostsSheetExport(),
-            'Hosted Families' => new HostedFamiliesSheetExport(),
             'Martyrs' => new MartyrsSheetExport(),
             'Shelters' => new SheltersSheetExport(),
             'Displaced Families' => new DisplacedFamiliesSheetExport(),

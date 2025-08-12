@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\Entry;
 use App\Models\Host;
-use App\Models\HostedFamily;
 use App\Models\Martyr;
 use App\Models\Shelter;
 use App\Models\DisplacedFamily;
@@ -15,9 +14,6 @@ class WebhookController extends Controller
 {
     /**
      * Convert potential arrays to strings for database storage.
-     *
-     * @param mixed $value
-     * @return string|null
      */
     private function convertToString($value)
     {
@@ -29,9 +25,6 @@ class WebhookController extends Controller
 
     /**
      * Extract image URLs from nested structures.
-     *
-     * @param array $imagesData
-     * @return string|null
      */
     private function extractImages($imagesData)
     {
@@ -45,7 +38,35 @@ class WebhookController extends Controller
                 }
             }
         }
-        return !empty($urls) ? implode(',', $urls) : null;
+        return !empty($urls) ? json_encode($urls) : null;
+    }
+
+    /**
+     * Create displaced family record with common fields
+     */
+    private function createDisplacedFamily(array $data, ?int $entryId = null, ?int $shelterId = null)
+    {
+        $needsDetails = $data['الاحتياجاتالحالية'] ?? $data['الاحتياجاتالحاليةللعائلاتالمستضافة'] ?? [];
+
+        return DisplacedFamily::create([
+            'entry_id' => $entryId,
+            'shelter_id' => $shelterId,
+            'individuals_count' => $this->convertToString($data['عددالأفراد'] ?? null),
+            'contact' => $this->convertToString($data['اسمربالعائلةرقمالتواصل'] ?? null),
+            'wife_name' => $this->convertToString($data['اسمالزوجة'] ?? null),
+            'children_info' => $this->convertToString($data['أسماءوأعمارالأطفال'] ?? null),
+            'needs' =>$this->convertToString($needsDetails['يرجىاختيارالاحتياجات'] ?? null),
+//            isset($needsDetails['يرجىاختيارالاحتياجات']) ?
+//                json_encode((array)$needsDetails['يرجىاختيارالاحتياجات']) : null,
+            'assistance_type' => $this->convertToString($needsDetails['نوعالمساعدة'] ?? null),
+            'provider' => $this->convertToString($needsDetails['الجهةالمقدمةللمساعدة'] ?? null),
+            'date_received' => $this->convertToString($needsDetails['تاريخالحصولعليها'] ?? null),
+            'notes' => $this->convertToString($needsDetails['ملاحظاتإضافية'] ?? null),
+            'return_possible' => $this->convertToString($needsDetails['إمكانيةالعودةللمنزل2'] ?? null),
+            'previous_assistance' => $this->convertToString($needsDetails['هلتمتلقيمساعداتسابقة2'] ?? null),
+            'images' => $this->extractImages($needsDetails['صوراوفيديوهاتللتوثيق2'] ?? []),
+            'family_book_number' => $this->convertToString($data['رقمدفترالعائلةإنوجد'] ?? null),
+        ]);
     }
 
     public function handle(Request $request)
@@ -84,7 +105,7 @@ class WebhookController extends Controller
             if (isset($data['All']['أولابياناتالمضيف'])) {
                 $hostData = $data['All']['أولابياناتالمضيف'];
                 $fullName = $this->convertToString($hostData['الاسمالكاملللمضيف']['FirstAndLast'] ?? null);
-                if (!empty($fullName)) { // Check if primary field (full_name) is not null
+                if (!empty($fullName)) {
                     Host::create([
                         'entry_id' => $entry->id,
                         'full_name' => $fullName,
@@ -97,29 +118,13 @@ class WebhookController extends Controller
                 }
             }
 
-            // Create Hosted Families if primary fields are present
+            // Create Displaced Families directly associated with entry
             if (isset($data['All']['ثانياالعائلةالمستضافة']) && is_array($data['All']['ثانياالعائلةالمستضافة'])) {
-                foreach ($data['All']['ثانياالعائلةالمستضافة'] as $hosted) {
-                    $contact = $this->convertToString($hosted['اسمربالعائلةرقمالتواصل'] ?? null);
-                    $individualsCount = $this->convertToString($hosted['عددالأفراد'] ?? null);
-                    if (!empty($contact) || !empty($individualsCount)) { // Check primary fields
-                        $needsDetails = $hosted['الاحتياجاتالحاليةللعائلاتالمستضافة'] ?? [];
-                        HostedFamily::create([
-                            'entry_id' => $entry->id,
-                            'individuals_count' => $individualsCount,
-                            'contact' => $contact,
-                            'wife_name' => $this->convertToString($hosted['اسمالزوجة'] ?? null),
-                            'children_info' => $this->convertToString($hosted['أسماءوأعمارالأطفال'] ?? null),
-                            'needs' => $this->convertToString($needsDetails['يرجىاختيارالاحتياجات'] ?? null),
-                            'assistance_type' => $this->convertToString($needsDetails['نوعالمساعدة'] ?? null),
-                            'provider' => $this->convertToString($needsDetails['الجهةالمقدمةللمساعدة'] ?? null),
-                            'date_received' => $this->convertToString($needsDetails['تاريخالحصولعليها'] ?? null),
-                            'notes' => $this->convertToString($needsDetails['ملاحظاتإضافية'] ?? null),
-                            'return_possible' => $this->convertToString($needsDetails['إمكانيةالعودةللمنزل2'] ?? null),
-                            'previous_assistance' => $this->convertToString($needsDetails['هلتمتلقيمساعداتسابقة2'] ?? null),
-                            'images' => $this->extractImages($needsDetails['صوراوفيديوهاتللتوثيق2'] ?? []),
-                            'family_book_number' => $this->convertToString($hosted['رقمدفترالعائلةإنوجد'] ?? null),
-                        ]);
+                foreach ($data['All']['ثانياالعائلةالمستضافة'] as $familyData) {
+                    $contact = $this->convertToString($familyData['اسمربالعائلةرقمالتواصل'] ?? null);
+                    $individualsCount = $this->convertToString($familyData['عددالأفراد'] ?? null);
+                    if (!empty($contact) || !empty($individualsCount)) {
+                        $this->createDisplacedFamily($familyData, $entry->id, null);
                     }
                 }
             }
@@ -128,7 +133,7 @@ class WebhookController extends Controller
             if (isset($data['All']['أسماءالشهداء']) && is_array($data['All']['أسماءالشهداء'])) {
                 foreach ($data['All']['أسماءالشهداء'] as $martyr) {
                     $name = $this->convertToString($martyr['اسمالشهيد']['FirstAndLast'] ?? null);
-                    if (!empty($name)) { // Check primary field (name)
+                    if (!empty($name)) {
                         Martyr::create([
                             'entry_id' => $entry->id,
                             'name' => $name,
@@ -141,11 +146,11 @@ class WebhookController extends Controller
                 }
             }
 
-            // Create Shelters and Displaced Families if primary fields are present
+            // Create Shelters and their Displaced Families
             if (isset($data['All']['مكانالإيواء']) && is_array($data['All']['مكانالإيواء'])) {
                 foreach ($data['All']['مكانالإيواء'] as $shelterData) {
                     $place = $this->convertToString($shelterData['مكانالإيواءاوالاجار'] ?? null);
-                    if (!empty($place)) { // Check primary field (place)
+                    if (!empty($place)) {
                         $shelter = Shelter::create([
                             'entry_id' => $entry->id,
                             'place' => $place,
@@ -153,28 +158,13 @@ class WebhookController extends Controller
                             'images' => $this->extractImages($shelterData['صورةاوفيديوللمنزلالمتضررانوجد2'] ?? []),
                         ]);
 
+                        // Create Displaced Families associated with shelter
                         if (isset($shelterData['العائلةالنازحة']) && is_array($shelterData['العائلةالنازحة'])) {
-                            foreach ($shelterData['العائلةالنازحة'] as $displaced) {
-                                $contact = $this->convertToString($displaced['اسمربالعائلةرقمالتواصل'] ?? null);
-                                $individualsCount = $this->convertToString($displaced['عددالأفراد'] ?? null);
-                                if (!empty($contact) || !empty($individualsCount)) { // Check primary fields
-                                    $needsDetails = $displaced['الاحتياجاتالحالية'] ?? [];
-                                    DisplacedFamily::create([
-                                        'shelter_id' => $shelter->id,
-                                        'individuals_count' => $individualsCount,
-                                        'contact' => $contact,
-                                        'wife_name' => $this->convertToString($displaced['اسمالزوجة'] ?? null),
-                                        'children_info' => $this->convertToString($displaced['أسماءوأعمارالأطفال'] ?? null),
-                                        'needs' => $this->convertToString($needsDetails['يرجىاختيارالاحتياجات'] ?? null),
-                                        'assistance_type' => $this->convertToString($needsDetails['نوعالمساعدة'] ?? null),
-                                        'provider' => $this->convertToString($needsDetails['الجهةالمقدمةللمساعدة'] ?? null),
-                                        'date_received' => $this->convertToString($needsDetails['تاريخالحصولعليها'] ?? null),
-                                        'notes' => $this->convertToString($needsDetails['ملاحظاتإضافية'] ?? null),
-                                        'return_possible' => $this->convertToString($needsDetails['إمكانيةالعودةللمنزل2'] ?? null),
-                                        'previous_assistance' => $this->convertToString($needsDetails['هلتمتلقيمساعداتسابقة2'] ?? null),
-                                        'images' => $this->extractImages($needsDetails['صوراوفيديوهاتللتوثيق2'] ?? []),
-                                        'family_book_number' => $this->convertToString($displaced['رقمدفترالعائلةإنوجد'] ?? null),
-                                    ]);
+                            foreach ($shelterData['العائلةالنازحة'] as $familyData) {
+                                $contact = $this->convertToString($familyData['اسمربالعائلةرقمالتواصل'] ?? null);
+                                $individualsCount = $this->convertToString($familyData['عددالأفراد'] ?? null);
+                                if (!empty($contact) || !empty($individualsCount)) {
+                                    $this->createDisplacedFamily($familyData, null, $shelter->id);
                                 }
                             }
                         }

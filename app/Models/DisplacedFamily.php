@@ -28,7 +28,12 @@ class DisplacedFamily extends Model
 
     // No casts
 
-    public function shelter()
+    public function entry(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(Entry::class);
+    }
+
+    public function shelter(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(Shelter::class);
     }
