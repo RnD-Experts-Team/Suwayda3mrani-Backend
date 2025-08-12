@@ -35,7 +35,6 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 function renderField(label: string, value: any) {
-    // Only render if value is not null, undefined, or empty string
     if (value === null || value === undefined || value === '') return null;
     return (
         <p>
@@ -83,7 +82,7 @@ export default function Show({ entry }: Props) {
                     <p className="text-sm text-muted-foreground">All details for this entry and related models</p>
                 </div>
 
-                {/* Entry Basic Details */}
+                {/* Entry Details */}
                 <Card>
                     <CardHeader><CardTitle>Entry Details</CardTitle></CardHeader>
                     <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -109,8 +108,8 @@ export default function Show({ entry }: Props) {
                     </CardContent>
                 </Card>
 
-                {/* Host Details */}
-                {entry.host && (
+                {/* Host - only show if both id and full_name have data */}
+                {entry.host && entry.host.id && entry.host.full_name && (
                     <Card>
                         <CardHeader><CardTitle>Host Details</CardTitle></CardHeader>
                         <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -132,9 +131,7 @@ export default function Show({ entry }: Props) {
                 {/* Hosted Families */}
                 {entry.hostedFamilies?.length > 0 && (
                     <Card>
-                        <CardHeader>
-                            <CardTitle>Hosted Families ({entry.hostedFamilies.length})</CardTitle>
-                        </CardHeader>
+                        <CardHeader><CardTitle>Hosted Families ({entry.hostedFamilies.length})</CardTitle></CardHeader>
                         <CardContent>
                             {entry.hostedFamilies.map(family => (
                                 <Card key={family.id} className="mb-4">
@@ -164,14 +161,12 @@ export default function Show({ entry }: Props) {
                     </Card>
                 )}
 
-                {/* Martyrs */}
-                {entry.martyrs?.length > 0 && (
+                {/* Martyrs - only show if both id and name have data */}
+                {entry.martyrs?.filter(m => m.id && m.name).length > 0 && (
                     <Card>
-                        <CardHeader>
-                            <CardTitle>Martyrs ({entry.martyrs.length})</CardTitle>
-                        </CardHeader>
+                        <CardHeader><CardTitle>Martyrs ({entry.martyrs.filter(m => m.id && m.name).length})</CardTitle></CardHeader>
                         <CardContent>
-                            {entry.martyrs.map(martyr => (
+                            {entry.martyrs.filter(m => m.id && m.name).map(martyr => (
                                 <Card key={martyr.id} className="mb-4">
                                     <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div>
@@ -191,47 +186,92 @@ export default function Show({ entry }: Props) {
                     </Card>
                 )}
 
-                {/* Shelters */}
-                {entry.shelters?.length > 0 && (
+                {/* Shelters - only if have real data */}
+                {entry.shelters?.filter(s =>
+                    (s.place && s.place.trim() !== '') ||
+                    (s.contact && s.contact.trim() !== '') ||
+                    (s.images && s.images.trim() !== '') ||
+                    (s.displacedFamilies && s.displacedFamilies.length > 0)
+                ).length > 0 && (
                     <Card>
                         <CardHeader>
-                            <CardTitle>Shelters ({entry.shelters.length})</CardTitle>
+                            <CardTitle>
+                                Shelters ({
+                                entry.shelters.filter(s =>
+                                    (s.place && s.place.trim() !== '') ||
+                                    (s.contact && s.contact.trim() !== '') ||
+                                    (s.images && s.images.trim() !== '') ||
+                                    (s.displacedFamilies && s.displacedFamilies.length > 0)
+                                ).length
+                            })
+                            </CardTitle>
                         </CardHeader>
                         <CardContent>
-                            {entry.shelters.map(shelter => (
+                            {entry.shelters.filter(s =>
+                                (s.place && s.place.trim() !== '') ||
+                                (s.contact && s.contact.trim() !== '') ||
+                                (s.images && s.images.trim() !== '') ||
+                                (s.displacedFamilies && s.displacedFamilies.length > 0)
+                            ).map(shelter => (
                                 <Card key={shelter.id} className="mb-4">
                                     <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div>
                                             {renderField('ID:', shelter.id)}
-                                            {renderField('Place:', shelter.place)}
-                                            {renderField('Contact:', shelter.contact)}
+                                            {shelter.place && renderField('Place:', shelter.place)}
+                                            {shelter.contact && renderField('Contact:', shelter.contact)}
                                             {shelter.images && renderField('Images:', renderImageLinks(shelter.images))}
                                         </div>
                                     </CardContent>
-                                    {/* Nested Displaced Families */}
-                                    {shelter.displacedFamilies?.length > 0 && (
+
+                                    {/* Displaced Families */}
+                                    {shelter.displacedFamilies?.filter(df =>
+                                        (df.individuals_count && df.individuals_count.trim() !== '') ||
+                                        (df.contact && df.contact.trim() !== '') ||
+                                        (df.wife_name && df.wife_name.trim() !== '') ||
+                                        (df.children_info && df.children_info.trim() !== '') ||
+                                        (df.needs && df.needs.trim() !== '') ||
+                                        (df.images && df.images.trim() !== '')
+                                    ).length > 0 && (
                                         <div className="p-4">
-                                            <h4 className="font-semibold mb-2">Displaced Families ({shelter.displacedFamilies.length})</h4>
-                                            {shelter.displacedFamilies.map(family => (
+                                            <h4 className="font-semibold mb-2">
+                                                Displaced Families ({
+                                                shelter.displacedFamilies.filter(df =>
+                                                    (df.individuals_count && df.individuals_count.trim() !== '') ||
+                                                    (df.contact && df.contact.trim() !== '') ||
+                                                    (df.wife_name && df.wife_name.trim() !== '') ||
+                                                    (df.children_info && df.children_info.trim() !== '') ||
+                                                    (df.needs && df.needs.trim() !== '') ||
+                                                    (df.images && df.images.trim() !== '')
+                                                ).length
+                                            })
+                                            </h4>
+                                            {shelter.displacedFamilies.filter(df =>
+                                                (df.individuals_count && df.individuals_count.trim() !== '') ||
+                                                (df.contact && df.contact.trim() !== '') ||
+                                                (df.wife_name && df.wife_name.trim() !== '') ||
+                                                (df.children_info && df.children_info.trim() !== '') ||
+                                                (df.needs && df.needs.trim() !== '') ||
+                                                (df.images && df.images.trim() !== '')
+                                            ).map(family => (
                                                 <Card key={family.id} className="mt-2 mb-2">
                                                     <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                         <div>
                                                             {renderField('ID:', family.id)}
-                                                            {renderField('Individuals Count:', family.individuals_count)}
-                                                            {renderField('Contact:', family.contact)}
-                                                            {renderField('Wife Name:', family.wife_name)}
-                                                            {renderField('Children Info:', family.children_info)}
+                                                            {family.individuals_count && renderField('Individuals Count:', family.individuals_count)}
+                                                            {family.contact && renderField('Contact:', family.contact)}
+                                                            {family.wife_name && renderField('Wife Name:', family.wife_name)}
+                                                            {family.children_info && renderField('Children Info:', family.children_info)}
                                                             {family.needs && renderField('Needs:', family.needs.split(',').filter(s => s.trim() !== '').join(', '))}
-                                                            {renderField('Assistance Type:', family.assistance_type)}
-                                                            {renderField('Provider:', family.provider)}
-                                                            {renderField('Date Received:', family.date_received)}
-                                                            {renderField('Notes:', family.notes)}
+                                                            {family.assistance_type && renderField('Assistance Type:', family.assistance_type)}
+                                                            {family.provider && renderField('Provider:', family.provider)}
+                                                            {family.date_received && renderField('Date Received:', family.date_received)}
+                                                            {family.notes && renderField('Notes:', family.notes)}
                                                         </div>
                                                         <div>
-                                                            {renderField('Return Possible:', family.return_possible)}
-                                                            {renderField('Previous Assistance:', family.previous_assistance)}
+                                                            {family.return_possible && renderField('Return Possible:', family.return_possible)}
+                                                            {family.previous_assistance && renderField('Previous Assistance:', family.previous_assistance)}
                                                             {family.images && renderField('Images:', renderImageLinks(family.images))}
-                                                            {renderField('Family Book Number:', family.family_book_number)}
+                                                            {family.family_book_number && renderField('Family Book Number:', family.family_book_number)}
                                                         </div>
                                                     </CardContent>
                                                 </Card>
@@ -253,4 +293,3 @@ export default function Show({ entry }: Props) {
         </AppLayout>
     );
 }
-

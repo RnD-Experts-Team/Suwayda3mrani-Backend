@@ -21,11 +21,15 @@ class EntryController extends Controller
         if ($request->filled('submitter_name')) {
             $query->where('submitter_name', 'like', "%{$request->submitter_name}%");
         }
-        if ($request->filled('location') && $request->location !== 'all') {
-            $query->where('location', $request->location);
+        if ($request->filled('location') && $request->input('location') !== 'all') {
+            if ($request->input('location') === 'no-location') {
+                $query->whereNull('location')->orWhere('location', '');
+            } else {
+                $query->where('location', $request->input('location'));
+            }
         }
-        if ($request->filled('status') && $request->status !== 'all') {
-            $query->where('status', $request->status);
+        if ($request->filled('status') && $request->input('status') !== 'all') {
+            $query->where('status', 'like', "%{$request->input('status')}%");
         }
 
         $entries = $query->orderBy('date_submitted', 'desc')
@@ -37,6 +41,7 @@ class EntryController extends Controller
             'filters' => $request->only(['entry_number', 'submitter_name', 'location', 'status']),
         ]);
     }
+
     public function show($id)
     {
         $entry = Entry::with([
@@ -46,12 +51,13 @@ class EntryController extends Controller
             'shelters.displacedFamilies'
         ])->findOrFail($id);
 
-        return \Inertia\Inertia::render('Entries/Show', [
+        return Inertia::render('Entries/Show', [
             'entry' => $entry
         ]);
     }
+
     public function export()
     {
-        return Excel::download(new EntriesExport, 'entries.xlsx');
+        return Excel::download(new EntriesExport(Entry::query()), 'entries-' . now()->format('Y-m-d_H-i-s') . '.xlsx');
     }
 }
