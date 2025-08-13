@@ -41,47 +41,42 @@ interface Props {
 }
 
 const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Entries', href: '/entries' },
+    { title: 'Form Entries', href: '/form-entries' },
 ];
 
 export default function EntriesIndex({ entries, filters = {} }: Props) {
     const applyFilters = (newFilters = {}) => {
-        router.get('/entries', { ...filters, ...newFilters }, {
+        router.get('/form-entries', { ...filters, ...newFilters }, {
             preserveState: true,
             preserveScroll: true
         });
     };
 
     const resetFilters = () => {
-        router.get('/entries');
+        router.get('/form-entries');
     };
 
     const isEmpty = entries.data.length === 0;
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Entries" />
+            <Head title="Form Entries" />
 
             <div className="flex h-full flex-1 flex-col gap-4 rounded-xl p-4 overflow-x-auto">
                 {/* Header */}
                 <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-center">
                     <div className="space-y-1">
-                        <h1 className="text-2xl font-bold tracking-tight">Entries</h1>
+                        <h1 className="text-2xl font-bold tracking-tight">Form Entries</h1>
                         <p className="text-sm text-muted-foreground">
                             {isEmpty ? "No entries found" : `Showing ${entries.from ?? 'N/A'}-${entries.to ?? 'N/A'} of ${entries.total} entries`}
                         </p>
                     </div>
                     <div className="flex gap-2">
-                        <a href="/entries/export">
+                        <a href="/form-entries/export">
                             <Button variant="secondary" className="gap-1">
                                 <Download className="h-4 w-4" /> Export
                             </Button>
                         </a>
-                        <Link href="/entries/create">
-                            <Button className="gap-1">
-                                <Plus className="h-4 w-4" /> New Entry
-                            </Button>
-                        </Link>
                     </div>
                 </div>
 
@@ -145,17 +140,12 @@ export default function EntriesIndex({ entries, filters = {} }: Props) {
                             </div>
                             <h3 className="mt-3 text-lg font-medium">No entries found</h3>
                             <p className="mt-1 text-sm text-muted-foreground">
-                                Create a new entry or adjust your filters to see results
+                                Adjust your filters to see results
                             </p>
                             <div className="mt-4 flex justify-center gap-3">
                                 <Button variant="outline" onClick={resetFilters}>
                                     <RotateCcw className="mr-2 h-4 w-4" /> Reset filters
                                 </Button>
-                                <Link href="/entries/create">
-                                    <Button>
-                                        <Plus className="mr-2 h-4 w-4" /> New Entry
-                                    </Button>
-                                </Link>
                             </div>
                         </CardContent>
                     </Card>
@@ -209,7 +199,7 @@ export default function EntriesIndex({ entries, filters = {} }: Props) {
                                     </div>
 
                                     <div className="mt-4 pt-3 border-t">
-                                        <Link href={`/entries/${entry.id}`} className="w-full">
+                                        <Link href={`/form-entries/${entry.id}`} className="w-full">
                                             <Button variant="default" className="w-full gap-2">
                                                 <Eye className="h-4 w-4" /> View Details
                                             </Button>
@@ -238,7 +228,7 @@ export default function EntriesIndex({ entries, filters = {} }: Props) {
                                 <Button
                                     key={page}
                                     variant={page === entries.current_page ? 'default' : 'outline'}
-                                    onClick={() => router.get(`/entries?page=${page}`)}
+                                    onClick={() => router.get(`/form-entries?page=${page}`)}
                                 >
                                     {page}
                                 </Button>

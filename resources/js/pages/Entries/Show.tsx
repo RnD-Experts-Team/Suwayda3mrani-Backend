@@ -30,7 +30,7 @@ interface Props {
 }
 
 const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Entries', href: '/entries' },
+    { title: 'Form Entries', href: '/form-entries' },
     { title: 'View', href: '' },
 ];
 
@@ -45,17 +45,48 @@ function renderField(label: string, value: any) {
 
 function renderImageLinks(images: string | null) {
     if (!images || images === '') return null;
-    const urls = images.split(',').filter(url => url.trim() !== '');
-    if (urls.length === 0) return null;
-    return (
-        <div className="flex flex-col gap-1">
-            {urls.map((url, idx) => (
-                <a key={idx} href={url.trim()} target="_blank" rel="noopener noreferrer" className="text-blue-500 flex gap-1 items-center">
-                    Image {idx + 1} <ExternalLink className="w-4 h-4" />
-                </a>
-            ))}
-        </div>
-    );
+    
+    try {
+        // Parse the JSON array
+        const urls = JSON.parse(images);
+        if (!Array.isArray(urls) || urls.length === 0) return null;
+        
+        return (
+            <div className="flex flex-col gap-1">
+                {urls.map((url, idx) => (
+                    <a 
+                        key={idx} 
+                        href={url.trim()} 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        className="text-blue-500 flex gap-1 items-center hover:underline"
+                    >
+                        Image {idx + 1} <ExternalLink className="w-4 h-4" />
+                    </a>
+                ))}
+            </div>
+        );
+    } catch (error) {
+        // Fallback: if it's not JSON, try the old comma-split method
+        const urls = images.split(',').filter(url => url.trim() !== '');
+        if (urls.length === 0) return null;
+        
+        return (
+            <div className="flex flex-col gap-1">
+                {urls.map((url, idx) => (
+                    <a 
+                        key={idx} 
+                        href={url.trim()} 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        className="text-blue-500 flex gap-1 items-center hover:underline"
+                    >
+                        Image {idx + 1} <ExternalLink className="w-4 h-4" />
+                    </a>
+                ))}
+            </div>
+        );
+    }
 }
 
 function renderStatus(status: string | null) {
@@ -87,7 +118,6 @@ export default function Show({ entry }: Props) {
                     <CardHeader><CardTitle>Entry Details</CardTitle></CardHeader>
                     <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            {renderField('ID:', entry.id)}
                             {renderField('Form ID:', entry.form_id)}
                             {renderField('Entry Number:', entry.entry_number)}
                             {renderField('Submitter Name:', entry.submitter_name)}
@@ -114,7 +144,6 @@ export default function Show({ entry }: Props) {
                         <CardHeader><CardTitle>Host Details</CardTitle></CardHeader>
                         <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
-                                {renderField('ID:', entry.host.id)}
                                 {renderField('Full Name:', entry.host.full_name)}
                                 {renderField('Family Count:', entry.host.family_count)}
                                 {renderField('Location:', entry.host.location)}
@@ -137,7 +166,6 @@ export default function Show({ entry }: Props) {
                                 <Card key={family.id} className="mb-4">
                                     <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div>
-                                            {renderField('ID:', family.id)}
                                             {renderField('Individuals Count:', family.individuals_count)}
                                             {renderField('Contact:', family.contact)}
                                             {renderField('Wife Name:', family.wife_name)}
@@ -170,7 +198,6 @@ export default function Show({ entry }: Props) {
                                 <Card key={martyr.id} className="mb-4">
                                     <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div>
-                                            {renderField('ID:', martyr.id)}
                                             {renderField('Name:', martyr.name)}
                                             {renderField('Age:', martyr.age)}
                                             {renderField('Place:', martyr.place)}
@@ -216,7 +243,6 @@ export default function Show({ entry }: Props) {
                                 <Card key={shelter.id} className="mb-4">
                                     <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div>
-                                            {renderField('ID:', shelter.id)}
                                             {shelter.place && renderField('Place:', shelter.place)}
                                             {shelter.contact && renderField('Contact:', shelter.contact)}
                                             {shelter.images && renderField('Images:', renderImageLinks(shelter.images))}
@@ -256,7 +282,6 @@ export default function Show({ entry }: Props) {
                                                 <Card key={family.id} className="mt-2 mb-2">
                                                     <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                         <div>
-                                                            {renderField('ID:', family.id)}
                                                             {family.individuals_count && renderField('Individuals Count:', family.individuals_count)}
                                                             {family.contact && renderField('Contact:', family.contact)}
                                                             {family.wife_name && renderField('Wife Name:', family.wife_name)}
@@ -286,7 +311,7 @@ export default function Show({ entry }: Props) {
 
                 <div className="flex justify-end">
                     <Button asChild variant="outline">
-                        <Link href="/entries">Back to Entries</Link>
+                        <Link href="/form-entries">Back to Entries</Link>
                     </Button>
                 </div>
             </div>

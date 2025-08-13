@@ -54,8 +54,8 @@ const mainNavItems: NavItem[] = [
         icon: LayoutGrid,
     },
     {
-        title: 'Entries',
-        href: '/entries',
+        title: 'Form Entries',
+        href: '/form-entries',
         icon: LayoutGrid,
     },
 
