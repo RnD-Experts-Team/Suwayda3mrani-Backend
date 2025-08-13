@@ -2,13 +2,12 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Entry extends Model
 {
-    use HasFactory;
-
     protected $fillable = [
         'form_id',
         'entry_number',
@@ -16,28 +15,29 @@ class Entry extends Model
         'submitter_name',
         'location',
         'status',
-        'entry_metadata',
+        'InternalLink'
     ];
 
-    // No casts for string/text fields
+    protected $casts = [
+        'date_submitted' => 'datetime',
+    ];
 
-    public function displacedFamilies(): \Illuminate\Database\Eloquent\Relations\HasMany
+    public function host(): HasOne
     {
-        return $this->hasMany(DisplacedFamily::class, 'entry_id');
+        return $this->hasOne(Host::class);
     }
 
-    // Keep your existing relationships
-    public function host()
+    public function displacedFamilies(): HasMany
     {
-        return $this->belongsTo(Host::class);
+        return $this->hasMany(DisplacedFamily::class);
     }
 
-    public function martyrs()
+    public function martyrs(): HasMany
     {
         return $this->hasMany(Martyr::class);
     }
 
-    public function shelters()
+    public function shelters(): HasMany
     {
         return $this->hasMany(Shelter::class);
     }

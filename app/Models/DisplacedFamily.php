@@ -2,20 +2,19 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class DisplacedFamily extends Model
 {
-    use HasFactory;
-
     protected $fillable = [
+        'entry_id',
         'shelter_id',
         'individuals_count',
         'contact',
         'wife_name',
         'children_info',
-        'needs',
         'assistance_type',
         'provider',
         'date_received',
@@ -24,16 +23,27 @@ class DisplacedFamily extends Model
         'previous_assistance',
         'images',
         'family_book_number',
+        'children_under_8_months',
+        'birth_details',
     ];
 
-    // No casts
+    protected $casts = [
+        'images' => 'array',
+    ];
 
-    public function entry(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    public function needs(): BelongsToMany
+    {
+        return $this->belongsToMany(Need::class, 'displaced_family_needs')
+            ->withPivot(['is_fulfilled', 'notes'])
+            ->withTimestamps();
+    }
+
+    public function entry(): BelongsTo
     {
         return $this->belongsTo(Entry::class);
     }
 
-    public function shelter(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    public function shelter(): BelongsTo
     {
         return $this->belongsTo(Shelter::class);
     }

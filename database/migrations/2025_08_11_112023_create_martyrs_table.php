@@ -30,7 +30,7 @@ return new class extends Migration
             // Martyr's age - comes from:
             // "أسماءالشهداء[X]/العمر"
             // Example: 25, 23
-            $table->integer('age');
+            $table->string('age');
 
             // Place of martyrdom - comes from:
             // "أسماءالشهداء[X]/مكانالاستشهاد"

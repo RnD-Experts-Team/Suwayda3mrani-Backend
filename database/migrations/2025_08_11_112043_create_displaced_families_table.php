@@ -23,25 +23,29 @@ return new class extends Migration
             $table->foreignId('entry_id')->nullable()->constrained()->onDelete('cascade');
 
             // Family information
-            $table->string('individuals_count');
-            $table->string('contact');
-            $table->string('wife_name');
-            $table->text('children_info');
+            $table->string('individuals_count')->nullable();
+            $table->string('contact')->nullable();
+            $table->string('wife_name')->nullable();
+            $table->text('children_info')->nullable();
             $table->string('family_book_number')->nullable();
 
-            // Needs and assistance
-            $table->text('needs')->nullable();
+            // Assistance information (removed 'needs' column since using pivot table)
             $table->string('assistance_type')->nullable();
             $table->string('provider')->nullable();
             $table->string('date_received')->nullable();
             $table->text('notes')->nullable();
 
+
             // Status flags
-            $table->string('return_possible'); // 'نعم' or 'لا'
-            $table->string('previous_assistance'); // 'نعم' or 'لا'
+            $table->string('return_possible')->nullable(); // 'نعم' or 'لا'
+            $table->string('previous_assistance')->nullable(); // 'نعم' or 'لا'
 
             // Documentation
             $table->json('images')->nullable();
+
+            // Children information
+            $table->string('children_under_8_months')->nullable();
+            $table->text('birth_details')->nullable(); // Added missing field
 
             // Automatic timestamps
             $table->timestamps();

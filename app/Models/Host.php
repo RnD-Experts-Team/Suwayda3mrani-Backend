@@ -16,6 +16,7 @@ class Host extends Model
         'location',
         'address',
         'phone',
+        'children_under_8_months',
         'family_book_number',
     ];
 
