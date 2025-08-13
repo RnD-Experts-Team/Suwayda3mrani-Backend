@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\EntryController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use App\Http\Controllers\LocalizationController;
@@ -45,7 +46,12 @@ Route::middleware(['auth'])->group(function () {
     Route::patch('timeline-events/{timelineEvent}/toggle-highlighted', [TimelineEventController::class, 'toggleHighlighted'])->name('timeline-events.toggle-highlighted');
     Route::resource('home-sections', HomeSectionController::class);
     Route::post('/home-sections/bulk-delete', [HomeSectionController::class, 'bulkDelete'])->name('home-sections.bulk-delete');
-});
+    Route::get('/entries/export', [EntryController::class, 'export'])->name('entries.export');
+    Route::get('/entries', [EntryController::class, 'index'])->name('entries.index');
+    Route::get('/entries/{entry}', [EntryController::class, 'show'])->name('entries.show');
 
+
+
+});
 require __DIR__.'/settings.php';
 require __DIR__.'/auth.php';
