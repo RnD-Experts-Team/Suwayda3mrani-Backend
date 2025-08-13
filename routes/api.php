@@ -22,6 +22,6 @@ Route::get('/media-gallery', [FrontEndController::class, 'getMediaItems']);
 Route::get('/timeline', [FrontEndController::class, 'timelineFront']);
 Route::get('/case/{caseId}', [FrontEndController::class, 'caseDetailFront']);
 
-Route::post('/webhook', [WebhookController::class, 'handle'])->name('webhook.handle');
+Route::post('/webhook/cognito-info-form', [WebhookController::class, 'handle'])->name('webhook.handle');
 
 
