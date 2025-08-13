@@ -16,9 +16,9 @@ class EntriesSheetExport implements FromCollection, WithHeadings, WithMapping, S
     {
         return Entry::with([
             'host',
-            'displacedFamilies', // Changed from hostedFamilies
+            'displacedFamilies.needs',
             'martyrs',
-            'shelters.displacedFamilies'
+            'shelters.displacedFamilies.needs'
         ])->get();
     }
 
@@ -34,7 +34,10 @@ class EntriesSheetExport implements FromCollection, WithHeadings, WithMapping, S
             'Host Name',
             'Host Family Count',
             'Host Location',
+            'Host Children Under 8 Months',
             'Displaced Families Count',
+            'Total Needs Count',
+            'Unique Needs Types',
             'Martyrs Count',
             'Shelters Count',
             'Internal Link',
@@ -43,6 +46,23 @@ class EntriesSheetExport implements FromCollection, WithHeadings, WithMapping, S
 
     public function map($entry): array
     {
+        // Calculate total needs across all displaced families
+        $allNeeds = collect();
+
+        // Add needs from direct displaced families
+        foreach ($entry->displacedFamilies as $family) {
+            $allNeeds = $allNeeds->merge($family->needs);
+        }
+
+        // Add needs from shelter displaced families
+        foreach ($entry->shelters as $shelter) {
+            foreach ($shelter->displacedFamilies as $family) {
+                $allNeeds = $allNeeds->merge($family->needs);
+            }
+        }
+
+        $uniqueNeeds = $allNeeds->unique('id')->pluck('name_ar');
+
         return [
             $entry->id,
             $entry->entry_number,
@@ -53,7 +73,12 @@ class EntriesSheetExport implements FromCollection, WithHeadings, WithMapping, S
             $entry->host->full_name ?? 'N/A',
             $entry->host->family_count ?? 'N/A',
             $entry->host->location ?? 'N/A',
-            $entry->displacedFamilies->count(), // Changed from hostedFamilies
+            $this->translateBoolean($entry->host->children_under_8_months ?? null),
+            $entry->displacedFamilies->count() + $entry->shelters->sum(function($shelter) {
+                return $shelter->displacedFamilies->count();
+            }),
+            $allNeeds->count(),
+            $uniqueNeeds->implode(', ') ?: 'N/A',
             $entry->martyrs->count(),
             $entry->shelters->count(),
             $entry->InternalLink,
@@ -63,8 +88,14 @@ class EntriesSheetExport implements FromCollection, WithHeadings, WithMapping, S
     public function styles(Worksheet $sheet)
     {
         return [
-            // Style the first row as bold text
             1 => ['font' => ['bold' => true]],
         ];
+    }
+
+    private function translateBoolean($value): string
+    {
+        if ($value === 'نعم') return 'Yes';
+        if ($value === 'لا') return 'No';
+        return $value ?? 'N/A';
     }
 }

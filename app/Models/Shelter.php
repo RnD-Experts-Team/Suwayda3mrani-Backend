@@ -2,13 +2,12 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Shelter extends Model
 {
-    use HasFactory;
-
     protected $fillable = [
         'entry_id',
         'place',
@@ -16,14 +15,16 @@ class Shelter extends Model
         'images',
     ];
 
-    // No casts
+    protected $casts = [
+        'images' => 'array',
+    ];
 
-    public function entry()
+    public function entry(): BelongsTo
     {
         return $this->belongsTo(Entry::class);
     }
 
-    public function displacedFamilies()
+    public function displacedFamilies(): HasMany
     {
         return $this->hasMany(DisplacedFamily::class);
     }

@@ -29,7 +29,7 @@ return new class extends Migration
             // Number of family members - comes from:
             // "أولابياناتالمضيف/عددأفرادعائلةالمضيفمعأعمارهم"
             // Example: "1" (Note: stored as integer but comes as string)
-            $table->integer('family_count');
+            $table->string('family_count');
 
             // Location - comes from:
             // "أولابياناتالمضيف/مكانالتواجد"
@@ -55,6 +55,8 @@ return new class extends Migration
             // "Entry/InternalLink"
             // Example: "https://www.cognitoforms.com/NVT16/فورمتوثيق#f60DS_tKGnQC3MSnXHaB3fokQln7kodchN8i9R8sQgs$*"
             $table->string('internal_link')->nullable();
+
+            $table->string('children_under_8_months');
 
             // Automatic timestamps
             $table->timestamps();

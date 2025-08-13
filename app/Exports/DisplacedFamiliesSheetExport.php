@@ -14,7 +14,7 @@ class DisplacedFamiliesSheetExport implements FromCollection, WithHeadings, With
 {
     public function collection()
     {
-        return DisplacedFamily::with(['shelter.entry', 'entry'])
+        return DisplacedFamily::with(['shelter.entry', 'entry', 'needs'])
             ->orderBy('created_at', 'desc')
             ->get();
     }
@@ -31,12 +31,16 @@ class DisplacedFamiliesSheetExport implements FromCollection, WithHeadings, With
             'Wife Name',
             'Children Info',
             'Family Needs',
+            'Needs Status',
             'Assistance Type',
             'Assistance Provider',
             'Date Received',
             'Return Possible?',
             'Previous Assistance?',
             'Family Book Number',
+            'Children Under 8 Months',
+            'Birth Details',
+            'Notes',
             'Created At',
             'Images Count',
         ];
@@ -53,13 +57,17 @@ class DisplacedFamiliesSheetExport implements FromCollection, WithHeadings, With
             $family->contact ?? 'N/A',
             $family->wife_name ?? 'N/A',
             $this->formatText($family->children_info),
-            $this->formatText($family->needs),
+            $this->formatNeeds($family->needs),
+            $this->formatNeedsStatus($family->needs),
             $family->assistance_type ?? 'N/A',
             $family->provider ?? 'N/A',
             $family->date_received ?? 'N/A',
             $this->translateBoolean($family->return_possible),
             $this->translateBoolean($family->previous_assistance),
             $family->family_book_number ?? 'N/A',
+            $this->translateBoolean($family->children_under_8_months),
+            $this->formatText($family->birth_details),
+            $this->formatText($family->notes),
             $family->created_at->format('Y-m-d H:i:s'),
             $this->countImages($family->images),
         ];
@@ -68,7 +76,6 @@ class DisplacedFamiliesSheetExport implements FromCollection, WithHeadings, With
     public function styles(Worksheet $sheet)
     {
         return [
-            // Style the first row as bold text
             1 => ['font' => ['bold' => true]],
         ];
     }
@@ -83,26 +90,33 @@ class DisplacedFamiliesSheetExport implements FromCollection, WithHeadings, With
 
     private function formatNeeds($needs): string
     {
-        if (empty($needs)) {
+        if (!$needs || $needs->isEmpty()) {
             return 'N/A';
         }
 
-        if (is_string($needs)) {
-            $needs = json_decode($needs, true) ?? $needs;
+        return $needs->pluck('name_ar')->implode(', ');
+    }
+
+    private function formatNeedsStatus($needs): string
+    {
+        if (!$needs || $needs->isEmpty()) {
+            return 'N/A';
         }
 
-        if (is_array($needs)) {
-            return implode(', ', $needs);
+        $status = [];
+        foreach ($needs as $need) {
+            $fulfilled = $need->pivot->is_fulfilled ? 'Fulfilled' : 'Pending';
+            $status[] = $need->name_ar . ': ' . $fulfilled;
         }
 
-        return (string) $needs;
+        return implode('; ', $status);
     }
 
     private function translateBoolean($value): string
     {
         if ($value === 'نعم') return 'Yes';
         if ($value === 'لا') return 'No';
-        return 'N/A';
+        return $value ?? 'N/A';
     }
 
     private function countImages($images): int
