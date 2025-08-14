@@ -1,4 +1,3 @@
-// resources/js/pages/Entries/Index.tsx
 import { Head, Link, router } from '@inertiajs/react';
 import AppLayout from '@/layouts/app-layout';
 import { Button } from '@/components/ui/button';
@@ -38,23 +37,25 @@ interface PaginationLink {
 }
 
 interface Props {
-    entries: {
-        data: Entry[];
-        links: PaginationLink[];
-        current_page: number;
-        last_page: number;
-        total: number;
-        per_page: number;
-        from: number | null;
-        to: number | null;
+    entries?: {
+        data?: Entry[];
+        links?: PaginationLink[];
+        current_page?: number;
+        last_page?: number;
+        total?: number;
+        per_page?: number;
+        from?: number | null;
+        to?: number | null;
     };
-    needs: Need[];
+    needs?: Need[];
+    predefinedNeeds?: Need[];
+    otherNeeds?: Need[];
     filters?: {
         entry_number?: string;
         submitter_name?: string;
         location?: string;
         status?: string;
-        needs?: number[];
+        needs?: number[] | number | string;
     };
 }
 
@@ -62,47 +63,107 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Form Entries', href: '/form-entries' },
 ];
 
-export default function EntriesIndex({ entries, needs, filters = {} }: Props) {
-    // Initialize state properly from filters
+export default function EntriesIndex({
+                                         entries = {},
+                                         needs = [],
+                                         predefinedNeeds = [],
+                                         otherNeeds = [],
+                                         filters = {}
+                                     }: Props) {
+    // Initialize state with proper type safety
     const [selectedNeeds, setSelectedNeeds] = useState<number[]>(() => {
-        return filters?.needs ? filters.needs.map(id => parseInt(String(id))) : [];
+        if (!filters?.needs) return [];
+
+        // Handle both array and single value cases
+        const needsArray = Array.isArray(filters.needs)
+            ? filters.needs
+            : [filters.needs];
+
+        return needsArray
+            .map(id => parseInt(String(id)))
+            .filter(id => !isNaN(id));
     });
+
+    // Form state for filters - NEW
+    const [formFilters, setFormFilters] = useState({
+        entry_number: filters?.entry_number || '',
+        submitter_name: filters?.submitter_name || '',
+        location: filters?.location || 'all',
+        status: filters?.status || 'all',
+    });
+
     const [needsPopoverOpen, setNeedsPopoverOpen] = useState(false);
 
-    // Better effect to sync state with URL parameters
+    // Safely get data with proper type guards
+    const entriesData = Array.isArray(entries?.data) ? entries.data : [];
+    const paginationLinks = Array.isArray(entries?.links) ? entries.links : [];
+    const needsList = Array.isArray(needs) ? needs : [];
+    const predefinedNeedsList = Array.isArray(predefinedNeeds) ? predefinedNeeds : [];
+    const otherNeedsList = Array.isArray(otherNeeds) ? otherNeeds : [];
+    const isEmpty = entriesData.length === 0;
+
+    // Sync selected needs with URL parameters
     useEffect(() => {
-        const urlNeeds = filters?.needs ? filters.needs.map(id => parseInt(String(id))) : [];
-        setSelectedNeeds(urlNeeds);
-    }, [JSON.stringify(filters?.needs)]); // Use JSON.stringify to properly detect array changes
-
-    const applyFilters = (newFilters = {}) => {
-        const filterParams = { ...filters, ...newFilters };
-
-        // Remove page when applying new filters (except for pagination clicks)
-        if (!newFilters.hasOwnProperty('page')) {
-            delete filterParams.page;
+        if (!filters?.needs) {
+            setSelectedNeeds([]);
+            return;
         }
 
-        // Force update needs state if needs are being updated
-        if (newFilters.hasOwnProperty('needs')) {
-            setSelectedNeeds(newFilters.needs || []);
+        const needsArray = Array.isArray(filters.needs)
+            ? filters.needs
+            : [filters.needs];
+
+        const urlNeeds = needsArray
+            .map(id => parseInt(String(id)))
+            .filter(id => !isNaN(id));
+
+        setSelectedNeeds(urlNeeds);
+    }, [filters?.needs]);
+
+    // Sync form state with URL filters
+    useEffect(() => {
+        setFormFilters({
+            entry_number: filters?.entry_number || '',
+            submitter_name: filters?.submitter_name || '',
+            location: filters?.location || 'all',
+            status: filters?.status || 'all',
+        });
+    }, [filters]);
+
+    const applyFilters = (additionalFilters = {}) => {
+        const filterParams = {
+            ...formFilters,
+            needs: selectedNeeds.length > 0 ? selectedNeeds : undefined,
+            ...additionalFilters
+        };
+
+        // Clean up empty filters
+        Object.keys(filterParams).forEach(key => {
+            const value = filterParams[key];
+            if (value === '' || value === 'all' || (Array.isArray(value) && value.length === 0)) {
+                delete filterParams[key];
+            }
+        });
+
+        // Remove page when applying new filters (except for pagination)
+        if (!additionalFilters.hasOwnProperty('page')) {
+            delete filterParams.page;
         }
 
         router.get('/form-entries', filterParams, {
             preserveState: true,
             preserveScroll: true,
-            replace: false,
-            onSuccess: () => {
-                // Force state sync after successful navigation
-                if (newFilters.hasOwnProperty('needs')) {
-                    setSelectedNeeds(newFilters.needs || []);
-                }
-            }
         });
     };
 
     const resetFilters = () => {
         setSelectedNeeds([]);
+        setFormFilters({
+            entry_number: '',
+            submitter_name: '',
+            location: 'all',
+            status: 'all',
+        });
         router.get('/form-entries', {}, {
             preserveState: false,
             preserveScroll: false
@@ -110,27 +171,35 @@ export default function EntriesIndex({ entries, needs, filters = {} }: Props) {
     };
 
     const handleNeedsChange = (needId: number, checked: boolean) => {
-        let updatedNeeds: number[];
-        if (checked) {
-            updatedNeeds = [...selectedNeeds, needId];
-        } else {
-            updatedNeeds = selectedNeeds.filter(id => id !== needId);
-        }
+        const updatedNeeds = checked
+            ? [...selectedNeeds, needId]
+            : selectedNeeds.filter(id => id !== needId);
+
         setSelectedNeeds(updatedNeeds);
-
-        // Apply immediately for better UX
-        applyFilters({ needs: updatedNeeds });
     };
 
-    const applyNeedsFilter = () => {
-        applyFilters({ needs: selectedNeeds });
-        setNeedsPopoverOpen(false);
+    const handleSelectAllOthers = (checked: boolean) => {
+        const otherNeedIds = otherNeedsList.map(need => need.id);
+
+        let updatedNeeds: number[];
+
+        if (checked) {
+            // Add all other needs that aren't already selected
+            const newOtherNeeds = otherNeedIds.filter(id => !selectedNeeds.includes(id));
+            updatedNeeds = [...selectedNeeds, ...newOtherNeeds];
+        } else {
+            // Remove all other needs
+            updatedNeeds = selectedNeeds.filter(id => !otherNeedIds.includes(id));
+        }
+
+        setSelectedNeeds(updatedNeeds);
     };
 
-    const clearNeedsFilter = () => {
-        setSelectedNeeds([]);
-        applyFilters({ needs: [] });
-        setNeedsPopoverOpen(false);
+    const handleFormChange = (field: string, value: string) => {
+        setFormFilters(prev => ({
+            ...prev,
+            [field]: value
+        }));
     };
 
     const handlePaginationClick = (url: string | null) => {
@@ -139,23 +208,36 @@ export default function EntriesIndex({ entries, needs, filters = {} }: Props) {
         const urlObj = new URL(url);
         const page = urlObj.searchParams.get('page');
 
-        // Preserve all current filters when paginating
-        router.get('/form-entries', {
-            ...filters,
-            page: page || 1
-        }, {
-            preserveState: true,
-            preserveScroll: false
-        });
+        applyFilters({ page: page || 1 });
     };
 
     const getSelectedNeedsNames = () => {
-        return needs
+        return needsList
             .filter(need => selectedNeeds.includes(need.id))
             .map(need => need.name_ar);
     };
 
-    const isEmpty = entries.data.length === 0;
+    // Check if form has changes compared to current filters
+    const hasFormChanges = () => {
+        return formFilters.entry_number !== (filters?.entry_number || '') ||
+            formFilters.submitter_name !== (filters?.submitter_name || '') ||
+            formFilters.location !== (filters?.location || 'all') ||
+            formFilters.status !== (filters?.status || 'all') ||
+            JSON.stringify(selectedNeeds) !== JSON.stringify(
+                Array.isArray(filters?.needs)
+                    ? filters.needs.map(id => parseInt(String(id))).filter(id => !isNaN(id))
+                    : filters?.needs ? [parseInt(String(filters.needs))].filter(id => !isNaN(id)) : []
+            );
+    };
+
+    const hasActiveFilters = selectedNeeds.length > 0 ||
+        Object.entries(filters).some(([key, value]) => {
+            if (!value) return false;
+            if (value === 'all') return false;
+            if (Array.isArray(value)) return value.length > 0;
+            if (typeof value === 'string') return value.trim() !== '';
+            return true;
+        });
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -167,7 +249,10 @@ export default function EntriesIndex({ entries, needs, filters = {} }: Props) {
                     <div className="space-y-1">
                         <h1 className="text-2xl font-bold tracking-tight">Form Entries</h1>
                         <p className="text-sm text-muted-foreground">
-                            {isEmpty ? "No entries found" : `Showing ${entries.from ?? 'N/A'}-${entries.to ?? 'N/A'} of ${entries.total} entries`}
+                            {isEmpty
+                                ? "No entries found"
+                                : `Showing ${entries?.from ?? 'N/A'}-${entries?.to ?? 'N/A'} of ${entries?.total ?? 0} entries`
+                            }
                         </p>
                     </div>
                     <div className="flex gap-2">
@@ -179,126 +264,187 @@ export default function EntriesIndex({ entries, needs, filters = {} }: Props) {
                     </div>
                 </div>
 
-                {/* Filters */}
+                {/* Filters with Manual Apply */}
                 <Card className="overflow-hidden">
-                    <CardContent className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-3">
-                        <div className="lg:col-span-1 flex gap-2">
+                    <CardContent className="p-4 space-y-4">
+                        {/* Filter Inputs Grid */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
+                            <Input
+                                placeholder="Entry Number"
+                                value={formFilters.entry_number}
+                                onChange={(e) => handleFormChange('entry_number', e.target.value)}
+                                className="w-full"
+                            />
+
+                            <Input
+                                placeholder="Submitter Name"
+                                value={formFilters.submitter_name}
+                                onChange={(e) => handleFormChange('submitter_name', e.target.value)}
+                                className="w-full"
+                            />
+
+                            <Select
+                                value={formFilters.location}
+                                onValueChange={(val) => handleFormChange('location', val)}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Location" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All Locations</SelectItem>
+                                    <SelectItem value="عائلة مضيفة">عائلة مضيفة</SelectItem>
+                                    <SelectItem value="مكان ايواء (او اجار)">مكان ايواء (او اجار)</SelectItem>
+                                    <SelectItem value="no-location">لا يوجد</SelectItem>
+                                </SelectContent>
+                            </Select>
+
+                            <Select
+                                value={formFilters.status}
+                                onValueChange={(val) => handleFormChange('status', val)}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Status" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All Statuses</SelectItem>
+                                    <SelectItem value="أسماء ضحايا">أسماء ضحايا</SelectItem>
+                                    <SelectItem value="منازل محترقة">منازل محترقة</SelectItem>
+                                    <SelectItem value="منازل مسروقة">منازل مسروقة</SelectItem>
+                                    <SelectItem value="نزوح">نزوح</SelectItem>
+                                </SelectContent>
+                            </Select>
+
+                            {/* Combined Needs Filter with "Select All Others" */}
+                            <Popover open={needsPopoverOpen} onOpenChange={setNeedsPopoverOpen}>
+                                <PopoverTrigger asChild>
+                                    <Button variant="outline" className="w-full justify-between">
+                                        <span>
+                                            {selectedNeeds.length === 0
+                                                ? 'Select Needs'
+                                                : `${selectedNeeds.length} need${selectedNeeds.length > 1 ? 's' : ''} selected`
+                                            }
+                                        </span>
+                                        <ChevronDown className="h-4 w-4 opacity-50" />
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-80 p-4" align="start">
+                                    <div className="space-y-4">
+                                        <div className="space-y-2">
+                                            <h4 className="font-medium text-sm">Filter by Needs</h4>
+                                            <div className="space-y-3 max-h-60 overflow-y-auto">
+                                                {/* Predefined Needs Section */}
+                                                {predefinedNeedsList.length > 0 && (
+                                                    <div className="space-y-2">
+                                                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide border-b pb-1">
+                                                            Predefined Needs
+                                                        </p>
+                                                        {predefinedNeedsList.map((need) => (
+                                                            <div key={need.id} className="flex items-center space-x-2">
+                                                                <Checkbox
+                                                                    id={`need-${need.id}`}
+                                                                    checked={selectedNeeds.includes(need.id)}
+                                                                    onCheckedChange={(checked) =>
+                                                                        handleNeedsChange(need.id, checked as boolean)
+                                                                    }
+                                                                />
+                                                                <Label htmlFor={`need-${need.id}`} className="text-sm font-normal cursor-pointer">
+                                                                    {need.name_ar}
+                                                                </Label>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+
+                                                {/* Other Needs Section with "Select All" */}
+                                                {otherNeedsList.length > 0 && (
+                                                    <div className="space-y-2">
+                                                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide border-b pb-1">
+                                                            Other Needs
+                                                        </p>
+
+                                                        {/* Select All Others Checkbox */}
+                                                        <div className="flex items-center space-x-2 bg-muted/50 p-2 rounded">
+                                                            <Checkbox
+                                                                id="select-all-others"
+                                                                checked={otherNeedsList.every(need => selectedNeeds.includes(need.id))}
+                                                                onCheckedChange={(checked) => handleSelectAllOthers(checked as boolean)}
+                                                            />
+                                                            <Label htmlFor="select-all-others" className="text-sm font-medium cursor-pointer">
+                                                                Other (Select All)
+                                                            </Label>
+                                                        </div>
+
+                                                        {/* Individual Other Needs */}
+                                                        {otherNeedsList.map((need) => (
+                                                            <div key={need.id} className="flex items-center space-x-2 ml-4">
+                                                                <Checkbox
+                                                                    id={`need-${need.id}`}
+                                                                    checked={selectedNeeds.includes(need.id)}
+                                                                    onCheckedChange={(checked) =>
+                                                                        handleNeedsChange(need.id, checked as boolean)
+                                                                    }
+                                                                />
+                                                                <Label htmlFor={`need-${need.id}`} className="text-sm font-normal cursor-pointer">
+                                                                    {need.name_ar}
+                                                                </Label>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+
+                                                {/* Fallback: Show all needs if separation failed */}
+                                                {predefinedNeedsList.length === 0 && otherNeedsList.length === 0 && needsList.length > 0 && (
+                                                    <div className="space-y-2">
+                                                        {needsList.map((need) => (
+                                                            <div key={need.id} className="flex items-center space-x-2">
+                                                                <Checkbox
+                                                                    id={`need-${need.id}`}
+                                                                    checked={selectedNeeds.includes(need.id)}
+                                                                    onCheckedChange={(checked) =>
+                                                                        handleNeedsChange(need.id, checked as boolean)
+                                                                    }
+                                                                />
+                                                                <Label htmlFor={`need-${need.id}`} className="text-sm font-normal cursor-pointer">
+                                                                    {need.name_ar}
+                                                                </Label>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </PopoverContent>
+                            </Popover>
+                        </div>
+
+                        {/* Action Buttons */}
+                        <div className="flex gap-2 pt-2">
+                            <Button
+                                onClick={() => applyFilters()}
+                                className="gap-1"
+                                disabled={!hasFormChanges()}
+                            >
+                                <Filter className="h-4 w-4" /> Apply Filters
+                            </Button>
                             <Button variant="outline" onClick={resetFilters} className="gap-1">
                                 <RotateCcw className="h-4 w-4" /> Reset
                             </Button>
                         </div>
-
-                        <Input
-                            placeholder="Entry Number"
-                            defaultValue={filters?.entry_number || ''}
-                            onBlur={(e) => applyFilters({ entry_number: e.target.value })}
-                            className="w-full"
-                        />
-
-                        <Input
-                            placeholder="Submitter Name"
-                            defaultValue={filters?.submitter_name || ''}
-                            onBlur={(e) => applyFilters({ submitter_name: e.target.value })}
-                            className="w-full"
-                        />
-
-                        <Select
-                            value={filters?.location || 'all'}
-                            onValueChange={(val) => applyFilters({ location: val === 'all' ? '' : val })}
-                        >
-                            <SelectTrigger>
-                                <SelectValue placeholder="Location" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">All Locations</SelectItem>
-                                <SelectItem value="عائلة مضيفة">عائلة مضيفة</SelectItem>
-                                <SelectItem value="مكان ايواء (او اجار)">مكان ايواء (او اجار)</SelectItem>
-                                <SelectItem value="no-location">لا يوجد</SelectItem>
-                            </SelectContent>
-                        </Select>
-
-                        <Select
-                            value={filters?.status || 'all'}
-                            onValueChange={(val) => applyFilters({ status: val === 'all' ? '' : val })}
-                        >
-                            <SelectTrigger>
-                                <SelectValue placeholder="Status" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">All Statuses</SelectItem>
-                                <SelectItem value="أسماء ضحايا">أسماء ضحايا</SelectItem>
-                                <SelectItem value="منازل محترقة">منازل محترقة</SelectItem>
-                                <SelectItem value="منازل مسروقة">منازل مسروقة</SelectItem>
-                                <SelectItem value="نزوح">نزوح</SelectItem>
-                            </SelectContent>
-                        </Select>
-
-                        {/* Needs Filter */}
-                        <Popover open={needsPopoverOpen} onOpenChange={setNeedsPopoverOpen}>
-                            <PopoverTrigger asChild>
-                                <Button variant="outline" className="w-full justify-between">
-                                    <span>
-                                        {selectedNeeds.length === 0
-                                            ? 'Select Needs'
-                                            : `${selectedNeeds.length} need${selectedNeeds.length > 1 ? 's' : ''} selected`
-                                        }
-                                    </span>
-                                    <ChevronDown className="h-4 w-4 opacity-50" />
-                                </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-80 p-4" align="start">
-                                <div className="space-y-4">
-                                    <div className="space-y-2">
-                                        <h4 className="font-medium text-sm">Filter by Needs</h4>
-                                        <div className="space-y-2 max-h-48 overflow-y-auto">
-                                            {needs.map((need) => {
-                                                const isChecked = selectedNeeds.includes(need.id);
-                                                return (
-                                                    <div key={need.id} className="flex items-center space-x-2">
-                                                        <Checkbox
-                                                            id={`need-${need.id}`}
-                                                            checked={isChecked}
-                                                            onCheckedChange={(checked) => handleNeedsChange(need.id, checked as boolean)}
-                                                        />
-                                                        <Label htmlFor={`need-${need.id}`} className="text-sm font-normal cursor-pointer">
-                                                            {need.name_ar}
-                                                        </Label>
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                    </div>
-
-                                    <div className="flex gap-2 pt-2">
-                                        <Button
-                                            onClick={applyNeedsFilter}
-                                            className="flex-1"
-                                            size="sm"
-                                        >
-                                            Apply Filter
-                                        </Button>
-                                        <Button
-                                            variant="outline"
-                                            onClick={clearNeedsFilter}
-                                            size="sm"
-                                        >
-                                            Clear
-                                        </Button>
-                                    </div>
-                                </div>
-                            </PopoverContent>
-                        </Popover>
                     </CardContent>
                 </Card>
 
                 {/* Active Filters Display */}
-                {(selectedNeeds.length > 0 || Object.values(filters).some(f => f && f !== 'all' && (Array.isArray(f) ? f.length > 0 : true))) && (
+                {hasActiveFilters && (
                     <div className="flex flex-wrap gap-2">
                         {filters?.entry_number && (
                             <Badge variant="secondary" className="gap-1">
                                 Entry: {filters.entry_number}
                                 <button
-                                    onClick={() => applyFilters({ entry_number: '' })}
+                                    onClick={() => {
+                                        setFormFilters(prev => ({...prev, entry_number: ''}));
+                                        applyFilters({ entry_number: '' });
+                                    }}
                                     className="ml-1 text-xs hover:text-red-500"
                                 >
                                     ×
@@ -310,7 +456,10 @@ export default function EntriesIndex({ entries, needs, filters = {} }: Props) {
                             <Badge variant="secondary" className="gap-1">
                                 Submitter: {filters.submitter_name}
                                 <button
-                                    onClick={() => applyFilters({ submitter_name: '' })}
+                                    onClick={() => {
+                                        setFormFilters(prev => ({...prev, submitter_name: ''}));
+                                        applyFilters({ submitter_name: '' });
+                                    }}
                                     className="ml-1 text-xs hover:text-red-500"
                                 >
                                     ×
@@ -322,7 +471,10 @@ export default function EntriesIndex({ entries, needs, filters = {} }: Props) {
                             <Badge variant="secondary" className="gap-1">
                                 Location: {filters.location}
                                 <button
-                                    onClick={() => applyFilters({ location: '' })}
+                                    onClick={() => {
+                                        setFormFilters(prev => ({...prev, location: 'all'}));
+                                        applyFilters({ location: '' });
+                                    }}
                                     className="ml-1 text-xs hover:text-red-500"
                                 >
                                     ×
@@ -334,7 +486,10 @@ export default function EntriesIndex({ entries, needs, filters = {} }: Props) {
                             <Badge variant="secondary" className="gap-1">
                                 Status: {filters.status}
                                 <button
-                                    onClick={() => applyFilters({ status: '' })}
+                                    onClick={() => {
+                                        setFormFilters(prev => ({...prev, status: 'all'}));
+                                        applyFilters({ status: '' });
+                                    }}
                                     className="ml-1 text-xs hover:text-red-500"
                                 >
                                     ×
@@ -342,12 +497,13 @@ export default function EntriesIndex({ entries, needs, filters = {} }: Props) {
                             </Badge>
                         )}
 
+                        {/* Selected Needs Badges */}
                         {getSelectedNeedsNames().map((needName, index) => (
                             <Badge key={index} variant="secondary" className="gap-1">
                                 {needName}
                                 <button
                                     onClick={() => {
-                                        const needToRemove = needs.find(n => n.name_ar === needName);
+                                        const needToRemove = needsList.find(n => n.name_ar === needName);
                                         if (needToRemove) {
                                             const updatedNeeds = selectedNeeds.filter(id => id !== needToRemove.id);
                                             setSelectedNeeds(updatedNeeds);
@@ -383,7 +539,7 @@ export default function EntriesIndex({ entries, needs, filters = {} }: Props) {
                     </Card>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {entries.data.map((entry) => (
+                        {entriesData.map((entry) => (
                             <Card key={entry.id} className="h-full flex flex-col hover:shadow-md transition-shadow">
                                 <CardContent className="p-4 flex-1 flex flex-col">
                                     <div className="space-y-3 flex-1">
@@ -397,7 +553,9 @@ export default function EntriesIndex({ entries, needs, filters = {} }: Props) {
                                             {entry.status && (
                                                 <div className="flex flex-wrap gap-1">
                                                     {entry.status.split(',').map((status, index) => (
-                                                        <Badge key={index} variant="outline" className="text-xs">{status.trim()}</Badge>
+                                                        <Badge key={index} variant="outline" className="text-xs">
+                                                            {status.trim()}
+                                                        </Badge>
                                                     ))}
                                                 </div>
                                             )}
@@ -443,49 +601,33 @@ export default function EntriesIndex({ entries, needs, filters = {} }: Props) {
                     </div>
                 )}
 
-                {/* Enhanced Pagination */}
-                {entries.last_page > 1 && (
+                {/* Pagination */}
+                {(entries?.last_page ?? 0) > 1 && (
                     <div className="flex flex-col items-center gap-4 pt-4">
-                        {/* Pagination Info */}
                         <div className="text-sm text-muted-foreground">
-                            Page {entries.current_page} of {entries.last_page} ({entries.total} total entries)
+                            Page {entries?.current_page ?? 1} of {entries?.last_page ?? 1} ({entries?.total ?? 0} total entries)
                         </div>
 
-                        {/* Pagination Controls */}
                         <div className="flex gap-1 flex-wrap justify-center">
-                            {entries.links.map((link, index) => {
-                                // Skip disabled prev/next links
+                            {paginationLinks.map((link, index) => {
                                 if (!link.url) {
                                     if (link.label.includes('Previous')) {
                                         return (
-                                            <Button
-                                                key={index}
-                                                variant="outline"
-                                                disabled
-                                                className="gap-1"
-                                            >
-                                                <ChevronLeft className="h-4 w-4" />
-                                                Previous
+                                            <Button key={index} variant="outline" disabled className="gap-1">
+                                                <ChevronLeft className="h-4 w-4" /> Previous
                                             </Button>
                                         );
                                     }
                                     if (link.label.includes('Next')) {
                                         return (
-                                            <Button
-                                                key={index}
-                                                variant="outline"
-                                                disabled
-                                                className="gap-1"
-                                            >
-                                                Next
-                                                <ChevronRight className="h-4 w-4" />
+                                            <Button key={index} variant="outline" disabled className="gap-1">
+                                                Next <ChevronRight className="h-4 w-4" />
                                             </Button>
                                         );
                                     }
                                     return null;
                                 }
 
-                                // Handle prev/next buttons
                                 if (link.label.includes('Previous')) {
                                     return (
                                         <Button
@@ -494,8 +636,7 @@ export default function EntriesIndex({ entries, needs, filters = {} }: Props) {
                                             onClick={() => handlePaginationClick(link.url)}
                                             className="gap-1"
                                         >
-                                            <ChevronLeft className="h-4 w-4" />
-                                            Previous
+                                            <ChevronLeft className="h-4 w-4" /> Previous
                                         </Button>
                                     );
                                 }
@@ -508,13 +649,11 @@ export default function EntriesIndex({ entries, needs, filters = {} }: Props) {
                                             onClick={() => handlePaginationClick(link.url)}
                                             className="gap-1"
                                         >
-                                            Next
-                                            <ChevronRight className="h-4 w-4" />
+                                            Next <ChevronRight className="h-4 w-4" />
                                         </Button>
                                     );
                                 }
 
-                                // Handle page numbers
                                 return (
                                     <Button
                                         key={index}
