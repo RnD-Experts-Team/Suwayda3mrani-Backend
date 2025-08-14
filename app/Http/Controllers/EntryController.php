@@ -17,6 +17,11 @@ class EntryController extends Controller
 {
     public function index(Request $request)
     {
+        // Normalize needs parameter to always be an array
+        if ($request->has('needs') && !is_array($request->input('needs'))) {
+            $request->merge(['needs' => [$request->input('needs')]]);
+        }
+
         $query = Entry::query();
 
         // Entry number filter
@@ -53,45 +58,49 @@ class EntryController extends Controller
             $query->whereDate('date_submitted', '<=', $request->input('date_to'));
         }
 
-        // Needs filter - handles your normalized needs structure
-        if ($request->filled('needs') && is_array($request->needs) && count($request->needs) > 0) {
-            $selectedNeeds = array_filter($request->needs);
+        // Combined Needs Filter - handles both predefined and other needs together
+        $hasNeedsFilter = $request->filled('needs') && is_array($request->needs) && count($request->needs) > 0;
+        $hasOtherNeedsFilter = $request->filled('other_needs') && !empty(trim($request->input('other_needs')));
 
-            if (!empty($selectedNeeds)) {
-                $needsIds = implode(',', array_map('intval', $selectedNeeds));
+        if ($hasNeedsFilter || $hasOtherNeedsFilter) {
+            $conditions = [];
+            $bindings = [];
+
+            // Add regular needs condition if selected
+            if ($hasNeedsFilter) {
+                $selectedNeeds = array_filter($request->needs);
+                if (!empty($selectedNeeds)) {
+                    $needsIds = implode(',', array_map('intval', $selectedNeeds));
+                    $conditions[] = "(dfn.need_id IN ({$needsIds}) OR dfn2.need_id IN ({$needsIds}))";
+                }
+            }
+
+            // Add other needs text search condition if provided
+            if ($hasOtherNeedsFilter) {
+                $otherNeedsText = trim($request->input('other_needs'));
+                $conditions[] = "((n.name LIKE 'other%' AND n.name_ar LIKE ?) OR (n2.name LIKE 'other%' AND n2.name_ar LIKE ?))";
+                $bindings[] = "%{$otherNeedsText}%";
+                $bindings[] = "%{$otherNeedsText}%";
+            }
+
+            // Combine conditions with OR logic
+            if (!empty($conditions)) {
+                $whereCondition = implode(' OR ', $conditions);
 
                 $query->whereRaw("
                     entries.id IN (
                         SELECT DISTINCT e.id FROM entries e
                         LEFT JOIN displaced_families df ON df.entry_id = e.id
                         LEFT JOIN displaced_family_needs dfn ON dfn.displaced_family_id = df.id
+                        LEFT JOIN needs n ON n.id = dfn.need_id
                         LEFT JOIN shelters s ON s.entry_id = e.id
                         LEFT JOIN displaced_families df2 ON df2.shelter_id = s.id
                         LEFT JOIN displaced_family_needs dfn2 ON dfn2.displaced_family_id = df2.id
-                        WHERE dfn.need_id IN ({$needsIds}) OR dfn2.need_id IN ({$needsIds})
+                        LEFT JOIN needs n2 ON n2.id = dfn2.need_id
+                        WHERE {$whereCondition}
                     )
-                ");
+                ", $bindings);
             }
-        }
-
-        // Other/Custom needs filter
-        if ($request->filled('other_needs')) {
-            $otherNeedsText = $request->input('other_needs');
-
-            $query->whereRaw("
-                entries.id IN (
-                    SELECT DISTINCT e.id FROM entries e
-                    LEFT JOIN displaced_families df ON df.entry_id = e.id
-                    LEFT JOIN displaced_family_needs dfn ON dfn.displaced_family_id = df.id
-                    LEFT JOIN needs n ON n.id = dfn.need_id
-                    LEFT JOIN shelters s ON s.entry_id = e.id
-                    LEFT JOIN displaced_families df2 ON df2.shelter_id = s.id
-                    LEFT JOIN displaced_family_needs dfn2 ON dfn2.displaced_family_id = df2.id
-                    LEFT JOIN needs n2 ON n2.id = dfn2.need_id
-                    WHERE (n.name_ar LIKE ? OR n.name LIKE ? OR n2.name_ar LIKE ? OR n2.name LIKE ?)
-                    AND (n.name LIKE 'other_%' OR n2.name LIKE 'other_%')
-                )
-            ", ["%{$otherNeedsText}%", "%{$otherNeedsText}%", "%{$otherNeedsText}%", "%{$otherNeedsText}%"]);
         }
 
         // Needs fulfillment filter
@@ -149,17 +158,20 @@ class EntryController extends Controller
             ->paginate(12)
             ->withQueryString();
 
-        // Get filter options
+        // Get filter options - Include ALL needs (predefined + other)
         $allNeeds = Need::orderBy('name_ar')->get();
 
         // Separate predefined and custom needs
         $predefinedNeeds = $allNeeds->filter(function($need) {
-            return !str_starts_with($need->name, 'other_');
-        });
+            return !str_starts_with($need->name, 'other');
+        })->values();
 
-        $customNeeds = $allNeeds->filter(function($need) {
-            return str_starts_with($need->name, 'other_');
-        });
+        $otherNeeds = $allNeeds->filter(function($need) {
+            return str_starts_with($need->name, 'other');
+        })->values();
+
+        // Combine both for the dropdown - predefined first, then other needs
+        $allNeedsForDropdown = $predefinedNeeds->concat($otherNeeds)->values();
 
         $allLocations = Entry::select('location')
             ->whereNotNull('location')
@@ -184,22 +196,32 @@ class EntryController extends Controller
             ->sort()
             ->values();
 
+        // Debug logging
+        \Log::info('Entries Index Response Debug:', [
+            'entries_type' => gettype($entries),
+            'entries_data_count' => count($entries->items()),
+            'total_needs_count' => count($allNeedsForDropdown),
+            'predefined_needs_count' => count($predefinedNeeds),
+            'other_needs_count' => count($otherNeeds),
+            'filters_needs' => $request->input('needs'),
+            'filters_other_needs' => $request->input('other_needs'),
+        ]);
+
         return Inertia::render('Entries/Index', [
             'entries' => $entries,
-            'needs' => $predefinedNeeds,
-            'customNeeds' => $customNeeds,
+            'needs' => $allNeedsForDropdown->toArray(), // Send all needs including others
+            'predefinedNeeds' => $predefinedNeeds->toArray(),
+            'otherNeeds' => $otherNeeds->toArray(),
             'locations' => $allLocations,
             'statuses' => $allStatuses,
             'filters' => $request->only([
                 'entry_number', 'submitter_name', 'location', 'status', 'needs',
-                'other_needs', 'needs_fulfilled', 'date_from', 'date_to',
+                'other_needs',
+                'needs_fulfilled', 'date_from', 'date_to',
                 'family_size_min', 'family_size_max', 'has_children'
             ]),
         ]);
     }
-
-
-
 
     public function show($id)
     {
