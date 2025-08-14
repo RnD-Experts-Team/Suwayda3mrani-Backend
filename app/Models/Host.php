@@ -18,6 +18,7 @@ class Host extends Model
         'phone',
         'children_under_8_months',
         'family_book_number',
+        'birth_details'
     ];
 
     // No casts

@@ -28,6 +28,7 @@ return new class extends Migration
             ['name' => 'financial_support', 'name_ar' => 'دعم مالي', 'created_at' => now(), 'updated_at' => now()],
         ]);
 
+
         // Skip the old data migration since the 'needs' column no longer exists
         // and we're working with a fresh structure
     }
