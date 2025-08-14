@@ -36,7 +36,7 @@ class WebhookController extends Controller
 
         $urls = [];
         foreach ($imagesData as $item) {
-            if (isset($item['تحميل'])) {
+            if (isset($item['تحميل']) && is_array($item['تحميل'])) {
                 foreach ($item['تحميل'] as $file) {
                     if (isset($file['File']) && !empty($file['File'])) {
                         $urls[] = $file['File'];
@@ -52,19 +52,9 @@ class WebhookController extends Controller
      */
     private function processNeeds($needsData)
     {
-        if (empty($needsData)) {
+        if (empty($needsData) || !is_array($needsData)) {
             return [];
         }
-
-        // Convert to string first if it's an array
-        $needsString = $this->convertToString($needsData);
-        if (empty($needsString)) {
-            return [];
-        }
-
-        // Split comma-separated needs
-        $needsArray = array_map('trim', explode(',', $needsString));
-        $needsArray = array_filter($needsArray); // Remove empty values
 
         // Map Arabic needs to database IDs
         $needsMapping = [
@@ -79,9 +69,27 @@ class WebhookController extends Controller
         ];
 
         $needIds = [];
-        foreach ($needsArray as $need) {
+        foreach ($needsData as $need) {
+            $need = trim($need);
+
             if (isset($needsMapping[$need])) {
                 $needIds[] = $needsMapping[$need];
+            } else {
+                // Handle "Others" or any custom text - create new need record
+                $customNeed = Need::firstOrCreate(
+                    ['name_ar' => $need],
+                    [
+                        'name' => 'other_' . time() . '_' . rand(1000, 9999), // Generate unique English name
+                        'name_ar' => $need,
+                    ]
+                );
+                $needIds[] = $customNeed->id;
+
+                Log::info('Created/found custom need', [
+                    'need_text' => $need,
+                    'need_id' => $customNeed->id,
+                    'was_created' => $customNeed->wasRecentlyCreated
+                ]);
             }
         }
 
@@ -93,28 +101,16 @@ class WebhookController extends Controller
      */
     private function createDisplacedFamily(array $data, ?int $entryId = null, ?int $shelterId = null)
     {
-        // Validation to ensure we have proper linking
         if (is_null($entryId) && is_null($shelterId)) {
-            Log::warning('DisplacedFamily created without entry_id or shelter_id', [
-                'data' => $data,
+            Log::error('DisplacedFamily created without entry_id or shelter_id', [
                 'entryId' => $entryId,
                 'shelterId' => $shelterId
             ]);
         }
 
         $needsDetails = $data['الاحتياجاتالحالية'] ?? $data['الاحتياجاتالحاليةللعائلاتالمستضافة'] ?? [];
-
-        // Get needs data for processing
-        $needsData = $needsDetails['يرجىاختيارالاحتياجات'] ?? null;
+        $needsData = $needsDetails['يرجىاختيارالاحتياجات'] ?? [];
         $needIds = $this->processNeeds($needsData);
-
-        // Debug logging
-        Log::info('Creating displaced family', [
-            'entryId' => $entryId,
-            'shelterId' => $shelterId,
-            'needIds' => $needIds,
-            'contact' => $this->convertToString($data['اسمربالعائلةرقمالتواصل'] ?? null),
-        ]);
 
         $displacedFamily = DisplacedFamily::create([
             'entry_id' => $entryId,
@@ -123,6 +119,9 @@ class WebhookController extends Controller
             'contact' => $this->convertToString($data['اسمربالعائلةرقمالتواصل'] ?? null),
             'wife_name' => $this->convertToString($data['اسمالزوجة'] ?? null),
             'children_info' => $this->convertToString($data['أسماءوأعمارالأطفال'] ?? null),
+            'family_book_number' => $this->convertToString($data['رقمدفترالعائلةإنوجد'] ?? null),
+            'children_under_8_months' => $this->convertToString($data['هليوجداطفالتحتعمرال8اشهر'] ?? null),
+            'birth_details' => $this->convertToString($data['اذاكانالجوابنعميرجىذكرتاريخالولادةمعاسمالام'] ?? null),
             'assistance_type' => $this->convertToString($needsDetails['نوعالمساعدة'] ?? null),
             'provider' => $this->convertToString($needsDetails['الجهةالمقدمةللمساعدة'] ?? null),
             'date_received' => $this->convertToString($needsDetails['تاريخالحصولعليها'] ?? null),
@@ -130,19 +129,8 @@ class WebhookController extends Controller
             'return_possible' => $this->convertToString($needsDetails['إمكانيةالعودةللمنزل2'] ?? null),
             'previous_assistance' => $this->convertToString($needsDetails['هلتمتلقيمساعداتسابقة2'] ?? null),
             'images' => $this->extractImages($needsDetails['صوراوفيديوهاتللتوثيق2'] ?? []),
-            'family_book_number' => $this->convertToString($data['رقمدفترالعائلةإنوجد'] ?? null),
-            'children_under_8_months' => $this->convertToString($data['هليوجداطفالتحتعمرال8اشهر'] ?? null),
-            'birth_details' => $this->convertToString($data['اذاكانالجوابنعميرجىذكرتاريخالولادةمعاسمالام'] ?? null),
         ]);
 
-        // Log after creation
-        Log::info('Displaced family created', [
-            'id' => $displacedFamily->id,
-            'entry_id' => $displacedFamily->entry_id,
-            'shelter_id' => $displacedFamily->shelter_id,
-        ]);
-
-        // Attach needs to the displaced family using the pivot table
         if (!empty($needIds)) {
             $pivotData = [];
             foreach ($needIds as $needId) {
@@ -154,36 +142,30 @@ class WebhookController extends Controller
                 ];
             }
             $displacedFamily->needs()->attach($pivotData);
-
-            Log::info('Attached needs to displaced family', [
-                'family_id' => $displacedFamily->id,
-                'needs' => $needIds,
-            ]);
         }
 
         return $displacedFamily;
     }
 
+    /**
+     * Main webhook handler
+     */
     public function handle(Request $request)
     {
         $data = $request->all();
 
-        // Log incoming webhook data
-        Log::info('Webhook received', [
-            'form_id' => $data['Form']['Id'] ?? 'missing',
-            'entry_number' => $data['Entry']['Number'] ?? 'missing',
-        ]);
-
-        // Validate required fields for Entry
+        // Validate required fields
         if (!isset($data['Form']['Id'], $data['Entry']['Number'], $data['All'], $data['Entry']['InternalLink']) ||
             empty($data['Form']['Id']) || empty($data['Entry']['Number']) || empty($data['Entry']['InternalLink'])) {
-            Log::error('Invalid webhook data', ['data' => $data]);
-            return response()->json(['error' => 'Invalid data'], 400);
+            Log::error('Invalid webhook data - missing required fields', [
+                'form_id' => $data['Form']['Id'] ?? null,
+                'entry_number' => $data['Entry']['Number'] ?? null,
+            ]);
+            return response()->json(['error' => 'Invalid data - missing required fields'], 400);
         }
 
-        // Prevent duplicate entries
+        // Prevent duplicates
         if (Entry::where('entry_number', $data['Entry']['Number'])->exists()) {
-            Log::warning('Duplicate entry attempt', ['entry_number' => $data['Entry']['Number']]);
             return response()->json(['error' => 'Duplicate entry number'], 409);
         }
 
@@ -198,18 +180,16 @@ class WebhookController extends Controller
                 'submitter_name' => $this->convertToString($data['All']['اسمك']['FirstAndLast'] ?? null),
                 'location' => $this->convertToString($data['All']['مكانالتواجد'] ?? null),
                 'status' => $this->convertToString($data['All']['الحالة'] ?? null),
-                'InternalLink' => $this->convertToString($data['Entry']['InternalLink']),
+                'internal_link' => $this->convertToString($data['Entry']['InternalLink']),
             ]);
 
-            Log::info('Entry created', ['entry_id' => $entry->id, 'entry_number' => $entry->entry_number]);
-
-            // Create Host if primary fields are present
+            // Create Host
             if (isset($data['All']['أولابياناتالمضيف'])) {
                 $hostData = $data['All']['أولابياناتالمضيف'];
                 $fullName = $this->convertToString($hostData['الاسمالكاملللمضيف']['FirstAndLast'] ?? null);
 
                 if (!empty($fullName)) {
-                    $host = Host::create([
+                    Host::create([
                         'entry_id' => $entry->id,
                         'full_name' => $fullName,
                         'family_count' => $this->convertToString($hostData['عددأفرادعائلةالمضيفمعأعمارهم'] ?? null),
@@ -220,78 +200,60 @@ class WebhookController extends Controller
                         'children_under_8_months' => $this->convertToString($hostData['هليوجداطفالتحتعمرال8اشهر'] ?? null),
                         'birth_details' => $this->convertToString($hostData['اذاكانالجوابنعميرجىذكرتاريخالولادةمعاسمالام'] ?? null),
                     ]);
-
-                    Log::info('Host created', ['host_id' => $host->id, 'entry_id' => $entry->id]);
                 }
             }
 
-            // Create Displaced Families directly associated with entry
+            // Create Displaced Families
             if (isset($data['All']['ثانياالعائلةالمستضافة']) && is_array($data['All']['ثانياالعائلةالمستضافة'])) {
-                foreach ($data['All']['ثانياالعائلةالمستضافة'] as $index => $familyData) {
+                foreach ($data['All']['ثانياالعائلةالمستضافة'] as $familyData) {
                     $contact = $this->convertToString($familyData['اسمربالعائلةرقمالتواصل'] ?? null);
                     $individualsCount = $this->convertToString($familyData['عددالأفراد'] ?? null);
 
                     if (!empty($contact) || !empty($individualsCount)) {
-                        Log::info('Creating displaced family for entry', [
-                            'entry_id' => $entry->id,
-                            'family_index' => $index,
-                            'contact' => $contact,
-                        ]);
-
                         $this->createDisplacedFamily($familyData, $entry->id, null);
                     }
                 }
             }
 
-            // Create Martyrs if primary fields are present
+            // Create Martyrs
             if (isset($data['All']['أسماءالشهداء']) && is_array($data['All']['أسماءالشهداء'])) {
-                foreach ($data['All']['أسماءالشهداء'] as $martyr) {
-                    $name = $this->convertToString($martyr['اسمالشهيد']['FirstAndLast'] ?? null);
+                foreach ($data['All']['أسماءالشهداء'] as $martyrData) {
+                    $name = $this->convertToString($martyrData['اسمالشهيد']['FirstAndLast'] ?? null);
 
-                    if (!empty($name)) {
-                        $martyrRecord = Martyr::create([
+                    if (!empty($name) && trim($name) !== '') {
+                        Martyr::create([
                             'entry_id' => $entry->id,
                             'name' => $name,
-                            'age' => $this->convertToString($martyr['العمر'] ?? null),
-                            'place' => $this->convertToString($martyr['مكانالاستشهاد'] ?? null),
-                            'relative_contact' => $this->convertToString($martyr['اسماحدالاقاربمعرقمللتواصل'] ?? null),
-                            'image' => $this->extractImages($martyr['صورةللشهيدانوجد'] ?? []),
+                            'age' => $this->convertToString($martyrData['العمر'] ?? null),
+                            'place' => $this->convertToString($martyrData['مكانالاستشهاد'] ?? null),
+                            'relative_contact' => $this->convertToString($martyrData['اسماحدالاقاربمعرقمللتواصل'] ?? null),
+                            'image' => $this->extractImages($martyrData['صورةللشهيدانوجد'] ?? []),
                         ]);
-
-                        Log::info('Martyr created', ['martyr_id' => $martyrRecord->id, 'entry_id' => $entry->id]);
                     }
                 }
             }
 
-            // Create Shelters and their Displaced Families
+            // Create Shelters
             if (isset($data['All']['مكانالإيواء']) && is_array($data['All']['مكانالإيواء'])) {
-                foreach ($data['All']['مكانالإيواء'] as $shelterIndex => $shelterData) {
+                foreach ($data['All']['مكانالإيواء'] as $shelterData) {
                     $place = $this->convertToString($shelterData['مكانالإيواءاوالاجار'] ?? null);
+                    $contact = $this->convertToString($shelterData['رقمالتواصل'] ?? null);
 
-                    if (!empty($place)) {
+                    if (!empty($place) || !empty($contact)) {
                         $shelter = Shelter::create([
                             'entry_id' => $entry->id,
                             'place' => $place,
-                            'contact' => $this->convertToString($shelterData['رقمالتواصل'] ?? null),
+                            'contact' => $contact,
                             'images' => $this->extractImages($shelterData['صورةاوفيديوللمنزلالمتضررانوجد2'] ?? []),
                         ]);
 
-                        Log::info('Shelter created', ['shelter_id' => $shelter->id, 'entry_id' => $entry->id]);
-
-                        // Create Displaced Families associated with shelter
+                        // Create families in shelter
                         if (isset($shelterData['العائلةالنازحة']) && is_array($shelterData['العائلةالنازحة'])) {
-                            foreach ($shelterData['العائلةالنازحة'] as $familyIndex => $familyData) {
-                                $contact = $this->convertToString($familyData['اسمربالعائلةرقمالتواصل'] ?? null);
+                            foreach ($shelterData['العائلةالنازحة'] as $familyData) {
+                                $familyContact = $this->convertToString($familyData['اسمربالعائلةرقمالتواصل'] ?? null);
                                 $individualsCount = $this->convertToString($familyData['عددالأفراد'] ?? null);
 
-                                if (!empty($contact) || !empty($individualsCount)) {
-                                    Log::info('Creating displaced family for shelter', [
-                                        'shelter_id' => $shelter->id,
-                                        'entry_id' => $entry->id,
-                                        'family_index' => $familyIndex,
-                                        'contact' => $contact,
-                                    ]);
-
+                                if (!empty($familyContact) || !empty($individualsCount)) {
                                     $this->createDisplacedFamily($familyData, null, $shelter->id);
                                 }
                             }
@@ -301,12 +263,6 @@ class WebhookController extends Controller
             }
 
             DB::commit();
-
-            Log::info('Webhook processed successfully', [
-                'entry_id' => $entry->id,
-                'entry_number' => $entry->entry_number,
-            ]);
-
             return response()->json(['success' => true, 'entry_id' => $entry->id], 200);
 
         } catch (\Exception $e) {
@@ -314,7 +270,6 @@ class WebhookController extends Controller
 
             Log::error('Webhook processing failed', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
                 'file' => $e->getFile(),
                 'line' => $e->getLine(),
                 'entry_number' => $data['Entry']['Number'] ?? 'unknown',
@@ -322,7 +277,7 @@ class WebhookController extends Controller
 
             return response()->json([
                 'error' => 'Failed to process webhook',
-                'message' => $e->getMessage()
+                'message' => config('app.debug') ? $e->getMessage() : 'Internal server error',
             ], 500);
         }
     }
