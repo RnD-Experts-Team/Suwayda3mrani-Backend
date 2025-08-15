@@ -147,15 +147,10 @@ private function getTranslationsForKey($key)
     ];
 }
 
-    public function attachMedia($mediaIds)
+    public function attachMedia(array $mediaIds): void
     {
-        if (empty($mediaIds)) return;
-
         foreach ($mediaIds as $index => $mediaId) {
-            $this->media()->create([
-                'media_id' => $mediaId,
-                'sort_order' => $index
-            ]);
+            $this->media()->attach($mediaId, ['sort_order' => $index + 1]);
         }
     }
 
