@@ -538,7 +538,17 @@ $heroSection = $homeSections->firstWhere('type', 'hero');
             case 'upload':
                 return $media->file_path ? asset("storage/{$media->file_path}") : null;
             case 'google_drive':
-                return $media->google_drive_id ? "https://drive.google.com/uc?id={$media->google_drive_id}" : null;
+                if (!$media->google_drive_id) {
+                    return null;
+                }
+
+                // If it's a Google Drive IMAGE → use the lh3 direct content host
+                if (strtolower((string) $media->type) === 'image') {
+                    return "https://lh3.googleusercontent.com/d/{$media->google_drive_id}";
+                }
+
+                // Otherwise (e.g., video) keep existing behavior
+                return "https://drive.google.com/uc?id={$media->google_drive_id}";
             case 'external_link':
                 return $media->external_url;
             default:
@@ -556,7 +566,7 @@ $heroSection = $homeSections->firstWhere('type', 'hero');
         }
 
         if ($media->source_type === 'google_drive' && $media->type === 'image') {
-            return "https://drive.google.com/thumbnail?id={$media->google_drive_id}&sz=w300";
+            return "https://lh3.googleusercontent.com/d/{$media->google_drive_id}";
         }
 
         return $media->type === 'image' ? $fallbackUrl : null;
