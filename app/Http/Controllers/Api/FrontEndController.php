@@ -548,7 +548,7 @@ $heroSection = $homeSections->firstWhere('type', 'hero');
                 }
 
                 // Otherwise (e.g., video) keep existing behavior
-                return "https://drive.google.com/uc?id={$media->google_drive_id}";
+                return "https://drive.google.com/file/d/{$media->google_drive_id}/preview";
             case 'external_link':
                 return $media->external_url;
             default:

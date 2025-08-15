@@ -112,7 +112,7 @@ public function aidOrganizations()
                 }
 
                 // Otherwise (e.g., video) keep existing behavior
-                return "https://drive.google.com/uc?id={$this->google_drive_id}";
+                return "https://drive.google.com/file/d/{$this->google_drive_id}/preview";
             case 'external_link':
                 return $this->external_url;
             default:
@@ -136,7 +136,7 @@ public function aidOrganizations()
                 }
 
                 // Otherwise (e.g., video) keep existing behavior
-                return "https://drive.google.com/uc?id={$this->google_drive_id}";
+                return "https://drive.google.com/file/d/{$this->google_drive_id}/preview";
             case 'external_link':
                 return $this->external_url;
             default:
