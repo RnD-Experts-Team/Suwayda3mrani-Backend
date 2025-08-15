@@ -9,6 +9,7 @@ use App\Models\Localization;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class TimelineEventController extends Controller
 {
@@ -33,21 +34,12 @@ class TimelineEventController extends Controller
 
     public function create()
     {
-        $mediaItems = Media::select(['id', 'media_id', 'type', 'title_key', 'file_path', 'thumbnail_path'])
-            ->active()
-            ->ordered()
-            ->get()
-            ->map(function ($media) {
-                $content = $media->getMultilingualContent();
-                return [
-                    'id' => $media->id,
-                    'media_id' => $media->media_id,
-                    'type' => $media->type,
-                    'title' => $content['title']['en'] ?: 'Untitled Media',
-                    'url' => $content['url'],
-                    'thumbnail' => $content['thumbnail'] ?? $content['url']
-                ];
-            });
+        $mediaItems = $this->mapMediaItems(
+            Media::select(['id', 'media_id', 'type', 'title_key', 'file_path', 'thumbnail_path'])
+                ->active()
+                ->ordered()
+                ->get()
+        );
 
         return Inertia::render('TimelineEvents/Create', [
             'mediaItems' => $mediaItems
@@ -131,7 +123,7 @@ class TimelineEventController extends Controller
     public function edit(TimelineEvent $timelineEvent)
     {
         $timelineEvent->load(['media']);
-        
+
         // Get current translations
         $titleTranslations = $this->getTranslationsForKey($timelineEvent->title_key);
         $descriptionTranslations = $this->getTranslationsForKey($timelineEvent->description_key);
@@ -139,21 +131,12 @@ class TimelineEventController extends Controller
         $timelineEvent->title = $titleTranslations;
         $timelineEvent->description = $descriptionTranslations;
 
-        $mediaItems = Media::select(['id', 'media_id', 'type', 'title_key', 'file_path', 'thumbnail_path'])
-            ->active()
-            ->ordered()
-            ->get()
-            ->map(function ($media) {
-                $content = $media->getMultilingualContent();
-                return [
-                    'id' => $media->id,
-                    'media_id' => $media->media_id,
-                    'type' => $media->type,
-                    'title' => $content['title']['en'] ?: 'Untitled Media',
-                    'url' => $content['url'],
-                    'thumbnail' => $content['thumbnail'] ?? $content['url']
-                ];
-            });
+        $mediaItems = $this->mapMediaItems(
+            Media::select(['id', 'media_id', 'type', 'title_key', 'file_path', 'thumbnail_path'])
+                ->active()
+                ->ordered()
+                ->get()
+        );
 
         return Inertia::render('TimelineEvents/Edit', [
             'timelineEvent' => $timelineEvent,
@@ -238,7 +221,7 @@ class TimelineEventController extends Controller
 
         DB::transaction(function () use ($request) {
             $timelineEvents = TimelineEvent::whereIn('id', $request->ids)->get();
-            
+
             foreach ($timelineEvents as $timelineEvent) {
                 // Delete localizations
                 Localization::whereIn('key', [$timelineEvent->title_key, $timelineEvent->description_key])
@@ -280,5 +263,41 @@ class TimelineEventController extends Controller
             'en' => $translations['en'] ?? '',
             'ar' => $translations['ar'] ?? ''
         ];
+    }
+
+    /**
+     * Map Media models to the structure expected by the front-end,
+     * safely handling missing nested keys in multilingual content.
+     */
+    private function mapMediaItems($mediaCollection)
+    {
+        $locale = app()->getLocale();
+
+        return $mediaCollection->map(function ($media) use ($locale) {
+            $content = $media->getMultilingualContent();
+
+            // Safe nested reads with graceful fallbacks
+            $title = data_get($content, "title.$locale")
+                ?? data_get($content, 'title.en')
+                ?? data_get($content, 'title.ar')
+                ?? 'Untitled Media';
+
+            $url = data_get($content, 'url') ?? $media->file_path;
+            $thumbnail = data_get($content, 'thumbnail') ?? $media->thumbnail_path ?? $url;
+
+            // Optional: log when we had to fall back to the placeholder
+            if ($title === 'Untitled Media') {
+                Log::warning('Media missing localized title', ['media_id' => $media->id, 'locale' => $locale]);
+            }
+
+            return [
+                'id' => $media->id,
+                'media_id' => $media->media_id,
+                'type' => $media->type,
+                'title' => $title,
+                'url' => $url,
+                'thumbnail' => $thumbnail,
+            ];
+        });
     }
 }
