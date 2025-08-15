@@ -37,13 +37,12 @@ class FrontEndController extends Controller
     ];
 
     private function cacheRemember($key, $ttl, $callback) 
-{
-    if (config('app.disable_cache')) {
-        return $callback();
+    {
+        if (config('app.disable_cache')) {
+            return $callback();
+        }
+        return Cache::remember($key, $ttl, $callback);
     }
-    return Cache::remember($key, $ttl, $callback);
-}
-
 
     // ===================================
     // LAYOUT & NAVIGATION (OPTIMIZED)
@@ -52,7 +51,6 @@ class FrontEndController extends Controller
     public function layoutFront()
     {
         return $this->cacheRemember('layout_frontend_data_v3', self::CACHE_DURATION['extended'], function () {
-            // Single optimized query with minimal data
             $requiredKeys = [
                 'title', 'home', 'crisesArchive', 'media', 'aidEfforts', 'organizations', 
                 'information', 'stories', 'news', 'timeline', 'dataOverview',
@@ -61,14 +59,12 @@ class FrontEndController extends Controller
                 'toggleMenu', 'switchLanguage'
             ];
 
-            // ✅ Single query with proper indexing
             $localizations = Localization::select(['language', 'group', 'key', 'value'])
                 ->where('is_active', true)
                 ->whereIn('language', ['en', 'ar'])
                 ->whereIn('key', $requiredKeys)
                 ->get();
 
-            // ✅ Optimize grouping with single loop
             $result = ['en' => [], 'ar' => []];
             
             foreach ($localizations as $localization) {
@@ -83,7 +79,6 @@ class FrontEndController extends Controller
                 }
             }
 
-            // ✅ Static logo path (avoid Storage::disk call on every request)
             $result['logo'] = asset('storage/general/suwayda3mrani.png');
 
             return $result;
@@ -91,102 +86,98 @@ class FrontEndController extends Controller
     }
 
     // ===================================
-// HOME PAGE (OPTIMIZED)
-// ===================================
-public function homeFront()
-{
-    return $this->cacheRemember(
-        'home_frontend_data_v3',
-        self::CACHE_DURATION['medium'],
-        function () {
+    // HOME PAGE (OPTIMIZED)
+    // ===================================
+    public function homeFront()
+    {
+        return $this->cacheRemember(
+            'home_frontend_data_v3',
+            self::CACHE_DURATION['medium'],
+            function () {
 
-            $homeData = [];
+                $homeData = [];
 
-            // FIX: drop the non-existent column
-            $homeSections = HomeSection::select([
-                    'id',
-                    'type',
-                    'sort_order',
-                    'title_key',
-                    'description_key',
-                    'image_path',
-                    'button_text_key',
-                    'button_variant',
-                    'action_key',
-                ])
-                ->where('is_active', true)
-                ->orderBy('sort_order')
-                ->get();
+                $homeSections = HomeSection::select([
+                        'id',
+                        'type',
+                        'sort_order',
+                        'title_key',
+                        'description_key',
+                        'image_path',
+                        'button_text_key',
+                        'button_variant',
+                        'action_key',
+                    ])
+                    ->where('is_active', true)
+                    ->orderBy('sort_order')
+                    ->get();
 
-            $this->buildHeroSection($homeSections, $homeData);
-            $this->buildFeaturedMediaSection($homeData);
-            $this->buildFeaturedOrganizationsSection($homeData);
-            $this->buildFeaturedTestimoniesSection($homeData);
-            $this->buildFeaturedCasesSection($homeData); 
-            $this->buildDynamicSections($homeSections, $homeData);
+                $this->buildHeroSection($homeSections, $homeData);
+                $this->buildFeaturedMediaSection($homeData);
+                $this->buildFeaturedOrganizationsSection($homeData);
+                $this->buildFeaturedTestimoniesSection($homeData);
+                $this->buildFeaturedCasesSection($homeData); 
+                $this->buildDynamicSections($homeSections, $homeData);
 
-            usort(
-                $homeData,
-                fn ($a, $b) => ($a['sort_order'] ?? 999) <=> ($b['sort_order'] ?? 999)
-            );
+                usort(
+                    $homeData,
+                    fn ($a, $b) => ($a['sort_order'] ?? 999) <=> ($b['sort_order'] ?? 999)
+                );
 
-            return response()->json(
-                array_map(
-                    fn ($item) => array_diff_key($item, ['sort_order' => null]),
-                    $homeData
-                )
-            );
-        }
-    );
-}
+                return response()->json(
+                    array_map(
+                        fn ($item) => array_diff_key($item, ['sort_order' => null]),
+                        $homeData
+                    )
+                );
+            }
+        );
+    }
 
     /**
      * ✅ Optimized hero section builder
      */
     private function buildHeroSection($homeSections, array &$homeData): void
-{
-    // Make sure we have a hero section
-    if (! $homeSections->contains('type', 'hero')) {
-    return;
-}
+    {
+        if (! $homeSections->contains('type', 'hero')) {
+            return;
+        }
 
-// 2) Pull out that section
-$heroSection = $homeSections->firstWhere('type', 'hero');
+        $heroSection = $homeSections->firstWhere('type', 'hero');
 
-    // Pull translations with the correct model method
-    $heroContent = [
-        'en' => $heroSection->getTranslatedContent('en'),
-        'ar' => $heroSection->getTranslatedContent('ar'),
-    ];
-    $homeData[] = [
-        'id'         => "hero-{$heroSection->id}",
-        'type'       => 'hero',
-        'sort_order' => $heroSection->sort_order,
-        'content'    => [
-            'en' => [
-                'title' => $heroContent['en']['title']        ?? '',
-                'image' => $heroContent['en']['image']        ?? '',
-                'description' => $heroContent['en']['description'] ?? '',
-                'buttonText'   => $heroContent['en']['buttonText'] ?? '',
-                'buttonVariant'=> $heroContent['en']['buttonVariant'] ?? '',
+        $heroContent = [
+            'en' => $heroSection->getTranslatedContent('en'),
+            'ar' => $heroSection->getTranslatedContent('ar'),
+        ];
+
+        $homeData[] = [
+            'id'         => "hero-{$heroSection->id}",
+            'type'       => 'hero',
+            'sort_order' => $heroSection->sort_order,
+            'content'    => [
+                'en' => [
+                    'title' => $heroContent['en']['title']        ?? '',
+                    'image' => $heroContent['en']['image']        ?? '',
+                    'description' => $heroContent['en']['description'] ?? '',
+                    'buttonText'   => $heroContent['en']['buttonText'] ?? '',
+                    'buttonVariant'=> $heroContent['en']['buttonVariant'] ?? '',
+                ],
+                'ar' => [
+                    'title' => $heroContent['ar']['title']        ?? '',
+                    'image' => $heroContent['ar']['image']        ?? '',
+                    'description' => $heroContent['ar']['description'] ?? '',
+                    'buttonText'   => $heroContent['ar']['buttonText'] ?? '',
+                    'buttonVariant'=> $heroContent['ar']['buttonVariant'] ?? '',
+                ],
             ],
-            'ar' => [
-                'title' => $heroContent['ar']['title']        ?? '',
-                'image' => $heroContent['ar']['image']        ?? '',
-                'description' => $heroContent['ar']['description'] ?? '',
-                'buttonText'   => $heroContent['ar']['buttonText'] ?? '',
-                'buttonVariant'=> $heroContent['ar']['buttonVariant'] ?? '',
-            ],
-        ],
-    ];
-}
+        ];
+    }
 
     /**
      * ✅ Optimized featured media section builder
      */
     private function buildFeaturedMediaSection(&$homeData)
     {
-        // ✅ Use exists() check instead of count()
         if (!Media::where('is_active', true)->where('featured_on_home', true)->exists()) {
             return;
         }
@@ -200,7 +191,6 @@ $heroSection = $homeSections->firstWhere('type', 'hero');
 
         if ($featuredMedia->isEmpty()) return;
 
-        // ✅ Bulk load translations
         $mediaItems = $this->transformMediaCollectionWithBulkTranslations($featuredMedia);
 
         $homeData[] = [
@@ -312,165 +302,144 @@ $heroSection = $homeSections->firstWhere('type', 'hero');
      * ✅ Optimized dynamic sections builder
      */
     private function buildDynamicSections($homeSections, array &$homeData): void
-{
-    // Ignore the hero – everything else is “dynamic”
-    $dynamicSections = $homeSections->reject(fn ($s) => $s->type === 'hero');
+    {
+        $dynamicSections = $homeSections->reject(fn ($s) => $s->type === 'hero');
 
-    foreach ($dynamicSections as $section) {
-        // Pull translations with the correct model method
-        $contentEn = $section->getTranslatedContent('en');
-        $contentAr = $section->getTranslatedContent('ar');
+        foreach ($dynamicSections as $section) {
+            $contentEn = $section->getTranslatedContent('en');
+            $contentAr = $section->getTranslatedContent('ar');
 
-        $sectionData = [
-            'id'         => "{$section->type}-{$section->id}",
-            'type'       => $section->type,
-            'sort_order' => $section->sort_order,
-        ];
-        switch ($section->type) {
-            // Cards, key events, etc.
-            case 'component_node':
-            case 'key_events':
-                $sectionData['content'] = [
-                    'en' => [
-                        'title'        => $contentEn['title']        ?? '',
-                        'description'  => $contentEn['description']  ?? '',
-                        'imageUrl'     => $contentEn['image']        ?? '',
-                        'buttonText'   => $contentEn['buttonText']   ?? '',
-                        'buttonVariant'=> $contentEn['buttonVariant']?? '',
-                    ],
-                    'ar' => [
-                        'title'        => $contentAr['title']        ?? '',
-                        'description'  => $contentAr['description']  ?? '',
-                        'imageUrl'     => $contentAr['image']        ?? '',
-                        'buttonText'   => $contentAr['buttonText']   ?? '',
-                        'buttonVariant'=> $contentAr['buttonVariant']?? '',
-                    ],
-                    // Optional: add a URL derived from the action_key column if you have one
-                    'url' => $section->action_key ?? '',
-                ];
-                break;
+            $sectionData = [
+                'id'         => "{$section->type}-{$section->id}",
+                'type'       => $section->type,
+                'sort_order' => $section->sort_order,
+            ];
 
-            // A parent section that groups child sections
-            case 'section_group':
-                $sectionData['content'] = [
-                    'title' => [
-                        'en' => $contentEn['title'] ?? '',
-                        'ar' => $contentAr['title'] ?? '',
-                    ],
-                    // Fill this if you load child sections elsewhere
-                    'sections' => [],
-                ];
-                break;
+            switch ($section->type) {
+                case 'component_node':
+                case 'key_events':
+                    $sectionData['content'] = [
+                        'en' => [
+                            'title'        => $contentEn['title']        ?? '',
+                            'description'  => $contentEn['description']  ?? '',
+                            'imageUrl'     => $contentEn['image']        ?? '',
+                            'buttonText'   => $contentEn['buttonText']   ?? '',
+                            'buttonVariant'=> $contentEn['buttonVariant']?? '',
+                        ],
+                        'ar' => [
+                            'title'        => $contentAr['title']        ?? '',
+                            'description'  => $contentAr['description']  ?? '',
+                            'imageUrl'     => $contentAr['image']        ?? '',
+                            'buttonText'   => $contentAr['buttonText']   ?? '',
+                            'buttonVariant'=> $contentAr['buttonVariant']?? '',
+                        ],
+                        'url' => $section->action_key ?? '',
+                    ];
+                    break;
 
-            // Simple suggestion blocks
-            case 'suggestion':
-                $sectionData['content'] = [
-                    'en' => $contentEn,
-                    'ar' => $contentAr,
-                ];
-                break;
+                case 'section_group':
+                    $sectionData['content'] = [
+                        'title' => [
+                            'en' => $contentEn['title'] ?? '',
+                            'ar' => $contentAr['title'] ?? '',
+                        ],
+                        'sections' => [],
+                    ];
+                    break;
+
+                case 'suggestion':
+                    $sectionData['content'] = [
+                        'en' => $contentEn,
+                        'ar' => $contentAr,
+                    ];
+                    break;
+            }
+
+            $homeData[] = $sectionData;
         }
-        $homeData[] = $sectionData;
     }
-}
 
     // ===================================
     // MEDIA GALLERY (ULTRA-OPTIMIZED)
     // ===================================
     
-    /**
-     * Ultra-optimized media gallery with advanced caching and database optimization
-     */
     public function getMediaItems(Request $request)
-{
-    // ✅ Minimal validation with custom rules
-    $validated = $request->validate([
-        'page' => 'integer|min:1|max:1000', // Prevent abuse
-        'limit' => 'integer|min:1|max:24',   // Reasonable max
-        'type' => 'in:image,video,all'
-    ]);
+    {
+        $validated = $request->validate([
+            'page' => 'integer|min:1|max:1000',
+            'limit' => 'integer|min:1|max:24',
+            'type' => 'in:image,video,all'
+        ]);
 
-    $page = $validated['page'] ?? 1;
-    $limit = min($validated['limit'] ?? self::PAGINATION_LIMITS['gallery'], 24);
-    $type = $validated['type'] ?? 'all';
-    $offset = ($page - 1) * $limit;
+        $page = $validated['page'] ?? 1;
+        $limit = min($validated['limit'] ?? self::PAGINATION_LIMITS['gallery'], 24);
+        $type = $validated['type'] ?? 'all';
+        $offset = ($page - 1) * $limit;
 
-    // ✅ Multi-layer cache strategy
-    $mainCacheKey = "media_gallery_v2_{$type}_{$page}_{$limit}";
-    $countCacheKey = "media_gallery_count_v2_{$type}";
-    
-    return $this->cacheRemember($mainCacheKey, self::CACHE_DURATION['short'], function () use ($offset, $limit, $type, $countCacheKey, $page) {
+        $mainCacheKey = "media_gallery_v2_{$type}_{$page}_{$limit}";
+        $countCacheKey = "media_gallery_count_v2_{$type}";
         
-        // ✅ Get total count from separate cache to avoid expensive COUNT queries
-        $totalItems = $this->cacheRemember($countCacheKey, self::CACHE_DURATION['medium'], function () use ($type) {
-            $query = Media::where('is_active', true);
+        return $this->cacheRemember($mainCacheKey, self::CACHE_DURATION['short'], function () use ($offset, $limit, $type, $countCacheKey, $page) {
             
+            $totalItems = $this->cacheRemember($countCacheKey, self::CACHE_DURATION['medium'], function () use ($type) {
+                $query = Media::where('is_active', true);
+                
+                if ($type !== 'all') {
+                    $query->where('type', $type);
+                }
+                
+                return $query->count();
+            });
+
+            if ($totalItems === 0) {
+                return $this->buildEmptyGalleryResponse($totalItems, $limit, $page);
+            }
+
+            $query = Media::select([
+                'id', 'media_id', 'type', 'source_type', 'file_path', 
+                'google_drive_id', 'external_url', 'thumbnail_path', 
+                'title_key', 'description_key', 'source_url', 'created_at'
+            ])
+            ->where('is_active', true);
+
             if ($type !== 'all') {
                 $query->where('type', $type);
             }
-            
-            return $query->count();
+
+            $items = $query->orderByDesc('created_at')
+                          ->offset($offset)
+                          ->limit($limit)
+                          ->get();
+
+            $titleKeys = $items->pluck('title_key')->filter();
+            $descriptionKeys = $items->pluck('description_key')->filter();
+            $allKeys = $titleKeys->merge($descriptionKeys)->unique();
+
+            $translations = [];
+            if ($allKeys->isNotEmpty()) {
+                $translations = Localization::whereIn('key', $allKeys)
+                    ->whereIn('language', ['en', 'ar'])
+                    ->where('is_active', true)
+                    ->get()
+                    ->groupBy('key')
+                    ->map(function ($keyTranslations) {
+                        return $keyTranslations->pluck('value', 'language')->toArray();
+                    });
+            }
+
+            $mediaItems = $items->map(function ($item) use ($translations) {
+                return $this->transformMediaItemForGallery($item, $translations);
+            });
+
+            return $this->buildGalleryResponse($mediaItems, $totalItems, $page, $limit, $offset);
         });
+    }
 
-        // ✅ Early return if no items - NOW WITH CORRECT VARIABLES
-        if ($totalItems === 0) {
-            return $this->buildEmptyGalleryResponse($totalItems, $limit, $page);
-        }
-
-        // ✅ Optimized query with only necessary columns and proper indexing
-        $query = Media::select([
-            'id', 'media_id', 'type', 'source_type', 'file_path', 
-            'google_drive_id', 'external_url', 'thumbnail_path', 
-            'title_key', 'description_key', 'source_url', 'created_at'
-        ])
-        ->where('is_active', true);
-
-        if ($type !== 'all') {
-            $query->where('type', $type);
-        }
-
-        // ✅ Optimized ordering and pagination
-        $items = $query->orderByDesc('created_at')
-                      ->offset($offset)
-                      ->limit($limit)
-                      ->get();
-
-        // ✅ Bulk load all translations in one query to avoid N+1
-        $titleKeys = $items->pluck('title_key')->filter();
-        $descriptionKeys = $items->pluck('description_key')->filter();
-        $allKeys = $titleKeys->merge($descriptionKeys)->unique();
-
-        $translations = [];
-        if ($allKeys->isNotEmpty()) {
-            $translations = Localization::whereIn('key', $allKeys)
-                ->whereIn('language', ['en', 'ar'])
-                ->where('is_active', true)
-                ->get()
-                ->groupBy('key')
-                ->map(function ($keyTranslations) {
-                    return $keyTranslations->pluck('value', 'language')->toArray();
-                });
-        }
-
-        // ✅ Transform with pre-loaded translations
-        $mediaItems = $items->map(function ($item) use ($translations) {
-            return $this->transformMediaItemForGallery($item, $translations);
-        });
-
-        return $this->buildGalleryResponse($mediaItems, $totalItems, $page, $limit, $offset);
-    });
-}
-
-    /**
-     * ✅ Optimized media transformation with pre-loaded translations
-     */
     private function transformMediaItemForGallery($item, $translations)
     {
-        // Get translations efficiently
         $titleTrans = $translations[$item->title_key] ?? ['en' => '', 'ar' => ''];
         $descTrans = $translations[$item->description_key] ?? ['en' => '', 'ar' => ''];
 
-        // ✅ Optimized URL generation
         $mediaUrl = $this->getOptimizedMediaUrl($item);
         $thumbnailUrl = $this->getOptimizedThumbnailUrl($item, $mediaUrl);
 
@@ -494,9 +463,6 @@ $heroSection = $homeSections->firstWhere('type', 'hero');
         ];
     }
 
-    /**
-     * ✅ Bulk translation loading to prevent N+1 queries
-     */
     private function transformMediaCollectionWithBulkTranslations($mediaCollection)
     {
         $titleKeys = $mediaCollection->pluck('title_key')->filter();
@@ -529,9 +495,6 @@ $heroSection = $homeSections->firstWhere('type', 'hero');
         })->toArray();
     }
 
-    /**
-     * ✅ Optimized URL generation without Storage::disk calls
-     */
     private function getOptimizedMediaUrl($media)
     {
         switch ($media->source_type) {
@@ -541,13 +504,9 @@ $heroSection = $homeSections->firstWhere('type', 'hero');
                 if (!$media->google_drive_id) {
                     return null;
                 }
-
-                // If it's a Google Drive IMAGE → use the lh3 direct content host
                 if (strtolower((string) $media->type) === 'image') {
                     return "https://lh3.googleusercontent.com/d/{$media->google_drive_id}";
                 }
-
-                // Otherwise (e.g., video) keep existing behavior
                 return "https://drive.google.com/file/d/{$media->google_drive_id}/preview";
             case 'external_link':
                 return $media->external_url;
@@ -556,25 +515,19 @@ $heroSection = $homeSections->firstWhere('type', 'hero');
         }
     }
 
-    /**
-     * ✅ Optimized thumbnail generation
-     */
     private function getOptimizedThumbnailUrl($media, $fallbackUrl)
     {
         if ($media->thumbnail_path) {
             return asset("storage/{$media->thumbnail_path}");
         }
 
-        if ($media->source_type === 'google_drive' && $media->type === 'image') {
+        if ($media->source_type === 'google_drive' && strtolower((string) $media->type) === 'image') {
             return "https://lh3.googleusercontent.com/d/{$media->google_drive_id}";
         }
 
-        return $media->type === 'image' ? $fallbackUrl : null;
+        return strtolower((string) $media->type) === 'image' ? $fallbackUrl : null;
     }
 
-    /**
-     * ✅ Optimized response builders
-     */
     private function buildGalleryResponse($mediaItems, $totalItems, $page, $limit, $offset)
     {
         $hasMore = ($offset + $limit) < $totalItems;
@@ -626,9 +579,6 @@ $heroSection = $homeSections->firstWhere('type', 'hero');
         ]);
     }
 
-    /**
-     * ✅ Static loading messages to avoid repeated array creation
-     */
     private function getStaticLoadingMessages()
     {
         static $messages = null;
@@ -927,168 +877,167 @@ $heroSection = $homeSections->firstWhere('type', 'hero');
     }
 
     public function aidEffortsFront()
-{
-    return $this->cacheRemember('aid_efforts_frontend_data_v2', self::CACHE_DURATION['medium'], function () {
-        
-        $pageContentKeys = [
-            'aid_efforts_hero_title',
-            'aid_efforts_hero_description', 
-            'aid_efforts_section_title'
-        ];
-
-        $pageTranslations = Localization::select(['language', 'key', 'value'])
-            ->where('is_active', true)
-            ->where('group', 'aid_efforts')
-            ->whereIn('language', ['en', 'ar'])
-            ->whereIn('key', $pageContentKeys)
-            ->get()
-            ->groupBy('language')
-            ->map(fn($translations) => $translations->pluck('value', 'key')->toArray())
-            ->toArray();
-
-        $aidEffortsData = [
-            'pageContent' => [
-                'heroTitle' => [
-                    'en' => $pageTranslations['en']['aid_efforts_hero_title'] ?? 'Aid Efforts',
-                    'ar' => $pageTranslations['ar']['aid_efforts_hero_title'] ?? 'جهود المساعدة'
-                ],
-                'heroDescription' => [
-                    'en' => $pageTranslations['en']['aid_efforts_hero_description'] ?? 'Explore the organizations and initiatives dedicated to providing aid and support to those affected by the crisis. Learn about their work, impact, and how you can contribute.',
-                    'ar' => $pageTranslations['ar']['aid_efforts_hero_description'] ?? 'استكشف المنظمات والمبادرات المكرسة لتقديم المساعدة والدعم للمتضررين من الأزمة. تعرف على عملهم وتأثيرهم وكيف يمكنك المساهمة.'
-                ],
-                'sectionTitle' => [
-                    'en' => $pageTranslations['en']['aid_efforts_section_title'] ?? 'Aid Efforts',
-                    'ar' => $pageTranslations['ar']['aid_efforts_section_title'] ?? 'جهود المساعدة'
-                ]
-            ],
-            'actionButtons' => [
-                ['text' => ['en' => 'Donate', 'ar' => 'تبرع'], 'url' => '/donate'],
-                ['text' => ['en' => 'Volunteer', 'ar' => 'تطوع'], 'url' => '/volunteer'],
-                ['text' => ['en' => 'Get Involved', 'ar' => 'شارك معنا'], 'url' => '/get-involved']
-            ],
-            'sections' => []
-        ];
-
-        // International Organizations Section
-        $internationalOrgs = AidOrganization::with(['categories'])
-            ->active()
-            ->where('type', 'organizations')
-            ->where('is_featured', true)
-            ->orderBy('sort_order')
-            ->limit(self::PAGINATION_LIMITS['featured'])
-            ->get();
-
-        if ($internationalOrgs->count() > 0) {
-            $orgItems = $internationalOrgs->map(function ($org) {
-                $content = $org->getMultilingualContent();
-                return [
-                    'id' => $org->organization_id, // Added ID
-                    'en' => [
-                        'name' => $content['en']['name'] ?? '',
-                        'description' => $content['en']['description'] ?? '',
-                        'backgroundImage' => $content['en']['backgroundImage'] ?? '',
-                        'url' => $org->website_url ?: ($content['en']['url'] ?? '')
-                    ],
-                    'ar' => [
-                        'name' => $content['ar']['name'] ?? '',
-                        'description' => $content['ar']['description'] ?? '', 
-                        'backgroundImage' => $content['ar']['backgroundImage'] ?? '',
-                        'url' => $org->website_url ?: ($content['ar']['url'] ?? '')
-                    ]
-                ];
-            })->toArray();
-
-            $aidEffortsData['sections'][] = [
-                'id' => 'international-organizations',
-                'title' => [
-                    'en' => 'International Organizations',
-                    'ar' => 'المنظمات الدولية'
-                ],
-                'type' => 'organizations',
-                'items' => $orgItems
+    {
+        return $this->cacheRemember('aid_efforts_frontend_data_v2', self::CACHE_DURATION['medium'], function () {
+            
+            $pageContentKeys = [
+                'aid_efforts_hero_title',
+                'aid_efforts_hero_description', 
+                'aid_efforts_section_title'
             ];
-        }
 
-        // Local Groups Section (Initiatives)  
-        $localGroups = AidOrganization::with(['categories'])
-            ->active()
-            ->where('type', 'initiatives')
-            ->where('is_featured', true) 
-            ->orderBy('sort_order')
-            ->limit(self::PAGINATION_LIMITS['featured'])
-            ->get();
+            $pageTranslations = Localization::select(['language', 'key', 'value'])
+                ->where('is_active', true)
+                ->where('group', 'aid_efforts')
+                ->whereIn('language', ['en', 'ar'])
+                ->whereIn('key', $pageContentKeys)
+                ->get()
+                ->groupBy('language')
+                ->map(fn($translations) => $translations->pluck('value', 'key')->toArray())
+                ->toArray();
 
-        if ($localGroups->count() > 0) {
-            $initiativeItems = $localGroups->map(function ($initiative) {
-                $content = $initiative->getMultilingualContent();
-                return [
-                    'id' => $initiative->organization_id, // Added ID
-                    'en' => [
-                        'title' => $content['en']['name'] ?? '',
-                        'description' => $content['en']['description'] ?? '',
-                        'url' => $initiative->website_url ?: ($content['en']['url'] ?? '')
+            $aidEffortsData = [
+                'pageContent' => [
+                    'heroTitle' => [
+                        'en' => $pageTranslations['en']['aid_efforts_hero_title'] ?? 'Aid Efforts',
+                        'ar' => $pageTranslations['ar']['aid_efforts_hero_title'] ?? 'جهود المساعدة'
                     ],
-                    'ar' => [
-                        'title' => $content['ar']['name'] ?? '', 
-                        'description' => $content['ar']['description'] ?? '',
-                        'url' => $initiative->website_url ?: ($content['ar']['url'] ?? '')
-                    ]
-                ];
-            })->toArray();
-
-            $aidEffortsData['sections'][] = [
-                'id' => 'local-groups',
-                'title' => [
-                    'en' => 'Local Groups',
-                    'ar' => 'المجموعات المحلية'
-                ],
-                'type' => 'initiatives',
-                'items' => $initiativeItems
-            ];
-        }
-
-        // Stories of Hope Section
-        $storiesOfHope = Story::active()
-            ->featured()
-            ->orderBy('sort_order')
-            ->limit(self::PAGINATION_LIMITS['featured'])
-            ->get();
-
-        if ($storiesOfHope->count() > 0) {
-            $storyItems = $storiesOfHope->map(function ($story) {
-                $content = $story->getMultilingualContent();
-                return [
-                    'id' => $story->story_id, // Added ID
-                    'en' => [
-                        'name' => $content['title']['en'] ?? '',
-                        'description' => $content['description']['en'] ?? '',
-                        'backgroundImage' => $content['backgroundImage'] ?? '',
-                        'url' => $content['url'] ?? ''
+                    'heroDescription' => [
+                        'en' => $pageTranslations['en']['aid_efforts_hero_description'] ?? 'Explore the organizations and initiatives dedicated to providing aid and support to those affected by the crisis. Learn about their work, impact, and how you can contribute.',
+                        'ar' => $pageTranslations['ar']['aid_efforts_hero_description'] ?? 'استكشف المنظمات والمبادرات المكرسة لتقديم المساعدة والدعم للمتضررين من الأزمة. تعرف على عملهم وتأثيرهم وكيف يمكنك المساهمة.'
                     ],
-                    'ar' => [
-                        'name' => $content['title']['ar'] ?? '',
-                        'description' => $content['description']['ar'] ?? '',
-                        'backgroundImage' => $content['backgroundImage'] ?? '',
-                        'url' => $content['url'] ?? ''
+                    'sectionTitle' => [
+                        'en' => $pageTranslations['en']['aid_efforts_section_title'] ?? 'Aid Efforts',
+                        'ar' => $pageTranslations['ar']['aid_efforts_section_title'] ?? 'جهود المساعدة'
                     ]
-                ];
-            })->toArray();
-
-            $aidEffortsData['sections'][] = [
-                'id' => 'stories-of-hope',
-                'title' => [
-                    'en' => 'Stories of Hope',
-                    'ar' => 'قصص الأمل'
                 ],
-                'type' => 'organizations',
-                'items' => $storyItems
+                'actionButtons' => [
+                    ['text' => ['en' => 'Donate', 'ar' => 'تبرع'], 'url' => '/donate'],
+                    ['text' => ['en' => 'Volunteer', 'ar' => 'تطوع'], 'url' => '/volunteer'],
+                    ['text' => ['en' => 'Get Involved', 'ar' => 'شارك معنا'], 'url' => '/get-involved']
+                ],
+                'sections' => []
             ];
-        }
 
-        return response()->json($aidEffortsData);
-    });
-}
+            // International Organizations Section
+            $internationalOrgs = AidOrganization::with(['categories'])
+                ->active()
+                ->where('type', 'organizations')
+                ->where('is_featured', true)
+                ->orderBy('sort_order')
+                ->limit(self::PAGINATION_LIMITS['featured'])
+                ->get();
 
+            if ($internationalOrgs->count() > 0) {
+                $orgItems = $internationalOrgs->map(function ($org) {
+                    $content = $org->getMultilingualContent();
+                    return [
+                        'id' => $org->organization_id,
+                        'en' => [
+                            'name' => $content['en']['name'] ?? '',
+                            'description' => $content['en']['description'] ?? '',
+                            'backgroundImage' => $content['en']['backgroundImage'] ?? '',
+                            'url' => $org->website_url ?: ($content['en']['url'] ?? '')
+                        ],
+                        'ar' => [
+                            'name' => $content['ar']['name'] ?? '',
+                            'description' => $content['ar']['description'] ?? '', 
+                            'backgroundImage' => $content['ar']['backgroundImage'] ?? '',
+                            'url' => $org->website_url ?: ($content['ar']['url'] ?? '')
+                        ]
+                    ];
+                })->toArray();
+
+                $aidEffortsData['sections'][] = [
+                    'id' => 'international-organizations',
+                    'title' => [
+                        'en' => 'International Organizations',
+                        'ar' => 'المنظمات الدولية'
+                    ],
+                    'type' => 'organizations',
+                    'items' => $orgItems
+                ];
+            }
+
+            // Local Groups Section (Initiatives)  
+            $localGroups = AidOrganization::with(['categories'])
+                ->active()
+                ->where('type', 'initiatives')
+                ->where('is_featured', true) 
+                ->orderBy('sort_order')
+                ->limit(self::PAGINATION_LIMITS['featured'])
+                ->get();
+
+            if ($localGroups->count() > 0) {
+                $initiativeItems = $localGroups->map(function ($initiative) {
+                    $content = $initiative->getMultilingualContent();
+                    return [
+                        'id' => $initiative->organization_id,
+                        'en' => [
+                            'title' => $content['en']['name'] ?? '',
+                            'description' => $content['en']['description'] ?? '',
+                            'url' => $initiative->website_url ?: ($content['en']['url'] ?? '')
+                        ],
+                        'ar' => [
+                            'title' => $content['ar']['name'] ?? '', 
+                            'description' => $content['ar']['description'] ?? '',
+                            'url' => $initiative->website_url ?: ($content['ar']['url'] ?? '')
+                        ]
+                    ];
+                })->toArray();
+
+                $aidEffortsData['sections'][] = [
+                    'id' => 'local-groups',
+                    'title' => [
+                        'en' => 'Local Groups',
+                        'ar' => 'المجموعات المحلية'
+                    ],
+                    'type' => 'initiatives',
+                    'items' => $initiativeItems
+                ];
+            }
+
+            // Stories of Hope Section
+            $storiesOfHope = Story::active()
+                ->featured()
+                ->orderBy('sort_order')
+                ->limit(self::PAGINATION_LIMITS['featured'])
+                ->get();
+
+            if ($storiesOfHope->count() > 0) {
+                $storyItems = $storiesOfHope->map(function ($story) {
+                    $content = $story->getMultilingualContent();
+                    return [
+                        'id' => $story->story_id,
+                        'en' => [
+                            'name' => $content['title']['en'] ?? '',
+                            'description' => $content['description']['en'] ?? '',
+                            'backgroundImage' => $content['backgroundImage'] ?? '',
+                            'url' => $content['url'] ?? ''
+                        ],
+                        'ar' => [
+                            'name' => $content['title']['ar'] ?? '',
+                            'description' => $content['description']['ar'] ?? '',
+                            'backgroundImage' => $content['backgroundImage'] ?? '',
+                            'url' => $content['url'] ?? ''
+                        ]
+                    ];
+                })->toArray();
+
+                $aidEffortsData['sections'][] = [
+                    'id' => 'stories-of-hope',
+                    'title' => [
+                        'en' => 'Stories of Hope',
+                        'ar' => 'قصص الأمل'
+                    ],
+                    'type' => 'organizations',
+                    'items' => $storyItems
+                ];
+            }
+
+            return response()->json($aidEffortsData);
+        });
+    }
 
     // ===================================
     // TESTIMONIALS & STORIES (OPTIMIZED)
@@ -1141,7 +1090,6 @@ $heroSection = $homeSections->firstWhere('type', 'hero');
                 'allStories' => []
             ];
 
-            // Get Featured Testimonials (limit 3 for featured section)
             $featuredTestimonies = Testimony::with(['media'])
                 ->active()
                 ->featured()
@@ -1168,7 +1116,6 @@ $heroSection = $homeSections->firstWhere('type', 'hero');
                 })->toArray();
             }
 
-            // Get All Testimonials (paginated)
             $allTestimoniesPaginated = Testimony::with(['media'])
                 ->active()
                 ->orderBy('sort_order')
@@ -1285,7 +1232,6 @@ $heroSection = $homeSections->firstWhere('type', 'hero');
             foreach ($relatedOrganizations as $relatedOrg) {
                 $relatedContent = $relatedOrg->getMultilingualContent();
                 
-                // ✅ FIXED: Safe array access for backgroundImage
                 $logoUrl = '';
                 if ($relatedOrg->media->isNotEmpty()) {
                     $firstMedia = $relatedOrg->media->first();
@@ -1363,7 +1309,7 @@ $heroSection = $homeSections->firstWhere('type', 'hero');
     public function testimonyDetailFront($testimonyId)
     {
         return $this->cacheRemember("testimony_detail_frontend_data_v2_{$testimonyId}", self::CACHE_DURATION['medium'], function () use ($testimonyId) {
-            
+
             $testimony = Testimony::with(['media'])
                 ->active()
                 ->where('id', $testimonyId)
@@ -1375,7 +1321,7 @@ $heroSection = $homeSections->firstWhere('type', 'hero');
             }
 
             $testimonyContent = $testimony->getMultilingualContent();
-            
+
             $uiTranslationKeys = [
                 'copy_link_button_text',
                 'survivor_info_label',
@@ -1392,19 +1338,29 @@ $heroSection = $homeSections->firstWhere('type', 'hero');
                 ->map(fn($translations) => $translations->pluck('value', 'key')->toArray())
                 ->toArray();
 
-            $mediaItems = [];
-            
+            // --- Collect media into images/videos using ONLY $media->type ---
+            $imageItems = [];
+            $videoItems = [];
+
             if ($testimony->media->count() > 0) {
                 foreach ($testimony->media as $media) {
                     $mediaContent = $media->getMultilingualContent();
-                    if (!empty($mediaContent['url'])) {
-                        $mediaItems[] = $mediaContent['url'];
+                    $url = $mediaContent['url'] ?? null;
+                    if (!$url) {
+                        continue;
+                    }
+
+                    if (strtolower((string) $media->type) === 'video') {
+                        $videoItems[] = $url;
+                    } else {
+                        $imageItems[] = $url;
                     }
                 }
             }
 
-            if (empty($mediaItems) && $testimony->background_image_path) {
-                $mediaItems[] = asset("storage/{$testimony->background_image_path}");
+            // Fallback background image if no images gathered
+            if (empty($imageItems) && $testimony->background_image_path) {
+                $imageItems[] = asset("storage/{$testimony->background_image_path}");
             }
 
             $enhancedContent = [
@@ -1414,7 +1370,7 @@ $heroSection = $homeSections->firstWhere('type', 'hero');
 
             if ($testimony->survivor_name || $testimony->survivor_age || $testimony->survivor_location) {
                 $survivorInfo = [];
-                
+
                 if ($testimony->survivor_name) {
                     $survivorInfo[] = "Survivor: {$testimony->survivor_name}";
                 }
@@ -1440,7 +1396,8 @@ $heroSection = $homeSections->firstWhere('type', 'hero');
                     'title' => $testimonyContent['title']['en'] ?? 'Untitled Testimony',
                     'buttonText' => $uiTranslations['en']['copy_link_button_text'] ?? 'copy link',
                     'content' => $enhancedContent['en'],
-                    'images' => $mediaItems,
+                    'images' => $imageItems,
+                    'videos' => $videoItems,
                     'survivorName' => $testimony->survivor_name,
                     'survivorAge' => $testimony->survivor_age,
                     'survivorLocation' => $testimony->survivor_location,
@@ -1451,7 +1408,8 @@ $heroSection = $homeSections->firstWhere('type', 'hero');
                     'title' => $testimonyContent['title']['ar'] ?? 'شهادة بدون عنوان',
                     'buttonText' => $uiTranslations['ar']['copy_link_button_text'] ?? 'نسخ الرابط',
                     'content' => $enhancedContent['ar'],
-                    'images' => $mediaItems,
+                    'images' => $imageItems,
+                    'videos' => $videoItems,
                     'survivorName' => $testimony->survivor_name,
                     'survivorAge' => $testimony->survivor_age,
                     'survivorLocation' => $testimony->survivor_location,
@@ -1468,20 +1426,15 @@ $heroSection = $homeSections->firstWhere('type', 'hero');
     // TIMELINE EVENTS (NEW)
     // ===================================
 
-    /**
-     * Get timeline events for frontend display
-     */
     public function timelineFront()
     {
         return $this->cacheRemember('timeline_frontend_data_v1', self::CACHE_DURATION['medium'], function () {
             
-            // Get all active timeline events
             $timelineEvents = TimelineEvent::with(['media'])
                 ->active()
                 ->ordered()
                 ->get();
 
-            // Transform events for both languages
             $timelineData = [];
             
             foreach (['en', 'ar'] as $language) {
@@ -1510,9 +1463,6 @@ $heroSection = $homeSections->firstWhere('type', 'hero');
     // OPTIMIZED HELPER METHODS
     // ===================================
 
-    /**
-     * ✅ Ultra-fast translation helper with static caching
-     */
     private function getTranslationsForKey($key)
     {
         static $cache = [];
@@ -1535,195 +1485,198 @@ $heroSection = $homeSections->firstWhere('type', 'hero');
         return $cache[$key];
     }
 
-    // Add this new method to your FrontEndController class
+    // ===================================
+    // CASE DETAILS (UPDATED: images & videos split by $media->type)
+    // ===================================
 
-/**
- * Get case detail for frontend display with structured content
- */
-public function caseDetailFront($caseId)
-{
-    return $this->cacheRemember("case_detail_frontend_data_v2_{$caseId}", self::CACHE_DURATION['medium'], function () use ($caseId) {
-        
-        $case = Cases::with(['details', 'media'])
-            ->active()
-            ->where('id', $caseId)
-            ->orWhere('case_id', $caseId)
-            ->orWhere('url_slug', $caseId)
-            ->first();
-
-        if (!$case) {
-            return response()->json(['error' => 'Case not found'], 404);
-        }
-
-        // Get multilingual content
-        $caseContent = $case->getMultilingualContent();
-        
-        // Build the content structure
-        $structuredContent = $this->buildCaseContentStructure($case, $caseContent);
-        
-        // Get media items (images and videos)
-        $mediaItems = $this->getCaseMediaItems($case);
-
-        // Return the structured data
-        return response()->json([
-            'en' => [
-                'title' => $caseContent['title']['en'] ?? 'Untitled Case',
-                'content' => $structuredContent['en'],
-                'images' => $mediaItems
-            ],
-            'ar' => [
-                'title' => $caseContent['title']['ar'] ?? 'حالة بدون عنوان',
-                'content' => $structuredContent['ar'],
-                'images' => $mediaItems
-            ],
-            'metadata' => [
-                'case_id' => $case->case_id,
-                'type' => $case->type,
-                'incident_date' => $case->incident_date?->format('Y-m-d'),
-                'location' => $case->location,
-                'url_slug' => $case->url_slug
-            ]
-        ]);
-    });
-}
-
-/**
- * Build structured content from case description and details
- */
-private function buildCaseContentStructure($case, $caseContent)
-{
-    $content = [
-        'en' => '',
-        'ar' => ''
-    ];
-
-    // Start with the main description
-    foreach (['en', 'ar'] as $lang) {
-        if (!empty($caseContent['description'][$lang])) {
-            $content[$lang] = $caseContent['description'][$lang];
-        }
-
-        // Add case details if available
-        if ($case->details && $case->details->count() > 0) {
-            $detailsText = [];
+    /**
+     * Get case detail for frontend display with structured content
+     */
+    public function caseDetailFront($caseId)
+    {
+        return $this->cacheRemember("case_detail_frontend_data_v2_{$caseId}", self::CACHE_DURATION['medium'], function () use ($caseId) {
             
-            foreach ($case->details as $detail) {
-                $keyTranslations = $this->getTranslationsForKey($detail->key_localization_key);
-                $valueTranslations = $this->getTranslationsForKey($detail->value_localization_key);
+            $case = Cases::with(['details', 'media'])
+                ->active()
+                ->where('id', $caseId)
+                ->orWhere('case_id', $caseId)
+                ->orWhere('url_slug', $caseId)
+                ->first();
+
+            if (!$case) {
+                return response()->json(['error' => 'Case not found'], 404);
+            }
+
+            $caseContent = $case->getMultilingualContent();
+            $structuredContent = $this->buildCaseContentStructure($case, $caseContent);
+
+            // UPDATED: split into images/videos (ONLY by $media->type)
+            $media = $this->getCaseMediaItems($case);
+
+            return response()->json([
+                'en' => [
+                    'title' => $caseContent['title']['en'] ?? 'Untitled Case',
+                    'content' => $structuredContent['en'],
+                    'images' => $media['images'],
+                    'videos' => $media['videos'],
+                ],
+                'ar' => [
+                    'title' => $caseContent['title']['ar'] ?? 'حالة بدون عنوان',
+                    'content' => $structuredContent['ar'],
+                    'images' => $media['images'],
+                    'videos' => $media['videos'],
+                ],
+                'metadata' => [
+                    'case_id' => $case->case_id,
+                    'type' => $case->type,
+                    'incident_date' => $case->incident_date?->format('Y-m-d'),
+                    'location' => $case->location,
+                    'url_slug' => $case->url_slug
+                ]
+            ]);
+        });
+    }
+
+    private function buildCaseContentStructure($case, $caseContent)
+    {
+        $content = [
+            'en' => '',
+            'ar' => ''
+        ];
+
+        foreach (['en', 'ar'] as $lang) {
+            if (!empty($caseContent['description'][$lang])) {
+                $content[$lang] = $caseContent['description'][$lang];
+            }
+
+            if ($case->details && $case->details->count() > 0) {
+                $detailsText = [];
                 
-                $key = $keyTranslations[$lang] ?? '';
-                $value = $valueTranslations[$lang] ?? '';
+                foreach ($case->details as $detail) {
+                    $keyTranslations = $this->getTranslationsForKey($detail->key_localization_key);
+                    $valueTranslations = $this->getTranslationsForKey($detail->value_localization_key);
+                    
+                    $key = $keyTranslations[$lang] ?? '';
+                    $value = $valueTranslations[$lang] ?? '';
+                    
+                    if ($key && $value) {
+                        $detailsText[] = "{$key}: {$value}";
+                    }
+                }
                 
-                if ($key && $value) {
-                    $detailsText[] = "{$key}: {$value}";
+                if (!empty($detailsText)) {
+                    if (!empty($content[$lang])) {
+                        $content[$lang] .= "\n\n";
+                    }
+                    
+                    $sectionTitle = $lang === 'en' ? "--- Case Details ---" : "--- تفاصيل القضية ---";
+                    $content[$lang] .= $sectionTitle . "\n" . implode("\n", $detailsText);
                 }
             }
+
+            $metadataText = [];
             
-            if (!empty($detailsText)) {
+            if ($case->incident_date) {
+                $dateLabel = $lang === 'en' ? 'Date of Incident' : 'تاريخ الحادثة';
+                $metadataText[] = "{$dateLabel}: " . $case->incident_date->format('F j, Y');
+            }
+            
+            if ($case->location) {
+                $locationLabel = $lang === 'en' ? 'Location' : 'الموقع';
+                $metadataText[] = "{$locationLabel}: {$case->location}";
+            }
+            
+            $typeLabels = Cases::getCaseTypes();
+            if (isset($typeLabels[$case->type])) {
+                $typeLabel = $lang === 'en' ? 'Case Type' : 'نوع القضية';
+                $metadataText[] = "{$typeLabel}: {$typeLabels[$case->type][$lang]}";
+            }
+            
+            if (!empty($metadataText)) {
                 if (!empty($content[$lang])) {
                     $content[$lang] .= "\n\n";
                 }
                 
-                $sectionTitle = $lang === 'en' ? "--- Case Details ---" : "--- تفاصيل القضية ---";
-                $content[$lang] .= $sectionTitle . "\n" . implode("\n", $detailsText);
+                $sectionTitle = $lang === 'en' ? "--- Case Information ---" : "--- معلومات القضية ---";
+                $content[$lang] .= $sectionTitle . "\n" . implode("\n", $metadataText);
             }
+
         }
 
-        // Add metadata information
-        $metadataText = [];
-        
-        if ($case->incident_date) {
-            $dateLabel = $lang === 'en' ? 'Date of Incident' : 'تاريخ الحادثة';
-            $metadataText[] = "{$dateLabel}: " . $case->incident_date->format('F j, Y');
-        }
-        
-        if ($case->location) {
-            $locationLabel = $lang === 'en' ? 'Location' : 'الموقع';
-            $metadataText[] = "{$locationLabel}: {$case->location}";
-        }
-        
-        $typeLabels = Cases::getCaseTypes();
-        if (isset($typeLabels[$case->type])) {
-            $typeLabel = $lang === 'en' ? 'Case Type' : 'نوع القضية';
-            $metadataText[] = "{$typeLabel}: {$typeLabels[$case->type][$lang]}";
-        }
-        
-        if (!empty($metadataText)) {
-            if (!empty($content[$lang])) {
-                $content[$lang] .= "\n\n";
-            }
-            
-            $sectionTitle = $lang === 'en' ? "--- Case Information ---" : "--- معلومات القضية ---";
-            $content[$lang] .= $sectionTitle . "\n" . implode("\n", $metadataText);
-        }
-
+        return $content;
     }
 
-    return $content;
-}
+    /**
+     * Get media items (images and videos) for the case
+     * RULE: ONLY check $media->type; anything not 'video' is treated as image.
+     */
+    private function getCaseMediaItems($case)
+    {
+        $images = [];
+        $videos = [];
+        
+        if ($case->media && $case->media->count() > 0) {
+            foreach ($case->media as $media) {
+                $mediaUrl = $this->getOptimizedMediaUrl($media);
+                if (!$mediaUrl) {
+                    continue;
+                }
 
-/**
- * Get media items (images and videos) for the case
- */
-private function getCaseMediaItems($case)
-{
-    $mediaItems = [];
-    
-    if ($case->media && $case->media->count() > 0) {
-        foreach ($case->media as $media) {
-            $mediaUrl = $this->getOptimizedMediaUrl($media);
-            
-            if ($mediaUrl) {
-                $mediaItems[] = $mediaUrl;
+                if (strtolower((string) $media->type) === 'video') {
+                    $videos[] = $mediaUrl;
+                } else {
+                    $images[] = $mediaUrl;
+                }
             }
         }
-    }
-    
-    
-    return $mediaItems;
-}
-/**
- * ✅ Optimized featured cases section builder
- */
-private function buildFeaturedCasesSection(&$homeData)
-{
-    if (!Cases::where('is_active', true)->where('is_featured', true)->exists()) {
-        return;
-    }
-
-    $featuredCases = Cases::select(['id', 'case_id', 'type', 'title_key', 'url_slug']) // ✅ Added 'id' back
-        ->with(['details', 'media']) // ✅ Changed to 'media' (not 'mediaa')
-        ->where('is_active', true)
-        ->where('is_featured', true)
-        ->orderBy('sort_order')
-        ->limit(self::PAGINATION_LIMITS['featured'])
-        ->get();
-
-    if ($featuredCases->isEmpty()) return;
-
-    $casesContent = $featuredCases->map(function ($case) {
-        $content = $case->getMultilingualContent();
         
         return [
-            'id' => $case->case_id,
-            'type' => $case->type,
-            'url_slug' => $case->url_slug,
-            'imagePath' => $content['imagePath'],
-            'title' => $content['title'],
-            'details' => $content['details']
+            'images' => $images,
+            'videos' => $videos,
         ];
-    })->toArray();
+    }
 
-    $homeData[] = [
-        'id' => 'featured-cases',
-        'type' => 'featured_cases',
-        'sort_order' => 250,
-        'title' => [
-            'en' => 'Featured Cases',
-            'ar' => 'القضايا المميزة'
-        ],
-        'content' => $casesContent,
-    ];
-}
+    /**
+     * ✅ Optimized featured cases section builder
+     */
+    private function buildFeaturedCasesSection(&$homeData)
+    {
+        if (!Cases::where('is_active', true)->where('is_featured', true)->exists()) {
+            return;
+        }
 
+        $featuredCases = Cases::select(['id', 'case_id', 'type', 'title_key', 'url_slug'])
+            ->with(['details', 'media'])
+            ->where('is_active', true)
+            ->where('is_featured', true)
+            ->orderBy('sort_order')
+            ->limit(self::PAGINATION_LIMITS['featured'])
+            ->get();
+
+        if ($featuredCases->isEmpty()) return;
+
+        $casesContent = $featuredCases->map(function ($case) {
+            $content = $case->getMultilingualContent();
+            
+            return [
+                'id' => $case->case_id,
+                'type' => $case->type,
+                'url_slug' => $case->url_slug,
+                'imagePath' => $content['imagePath'],
+                'title' => $content['title'],
+                'details' => $content['details']
+            ];
+        })->toArray();
+
+        $homeData[] = [
+            'id' => 'featured-cases',
+            'type' => 'featured_cases',
+            'sort_order' => 250,
+            'title' => [
+                'en' => 'Featured Cases',
+                'ar' => 'القضايا المميزة'
+            ],
+            'content' => $casesContent,
+        ];
+    }
 }
