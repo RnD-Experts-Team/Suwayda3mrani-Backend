@@ -116,7 +116,17 @@ public function aidOrganizations()
             case 'upload':
                 return $this->file_path ? \Storage::disk('public')->url($this->file_path) : null;
             case 'google_drive':
-                return $this->google_drive_id ? "https://drive.google.com/uc?id={$this->google_drive_id}" : null;
+            if (!$this->google_drive_id) {
+                return null;
+            }
+
+            // If it's a Google Drive IMAGE → use the lh3 direct content host
+            if (strtolower((string) $this->type) === 'image') {
+                return "https://lh3.googleusercontent.com/d/{$this->google_drive_id}";
+            }
+
+            // Otherwise (e.g., video) keep existing behavior
+            return "https://drive.google.com/uc?id={$this->google_drive_id}";
             case 'external_link':
                 return $this->external_url;
             default:
@@ -132,7 +142,7 @@ public function aidOrganizations()
 
         // Auto-generate thumbnail for Google Drive images
         if ($this->source_type === 'google_drive' && $this->type === 'image') {
-            return "https://drive.google.com/thumbnail?id={$this->google_drive_id}&sz=w300";
+            return "https://lh3.googleusercontent.com/d/{$this->google_drive_id}";
         }
 
         return null;
