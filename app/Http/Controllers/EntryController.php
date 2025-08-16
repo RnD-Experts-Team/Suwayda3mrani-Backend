@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Exports\EntriesExport;
+use App\Exports\NeedsExport;
 use App\Models\DisplacedFamily;
 use App\Models\Entry;
 use App\Models\Host;
@@ -71,14 +72,16 @@ class EntryController extends Controller
                 $selectedNeeds = array_filter($request->needs);
                 if (!empty($selectedNeeds)) {
                     $needsIds = implode(',', array_map('intval', $selectedNeeds));
-                    $conditions[] = "(dfn.need_id IN ({$needsIds}) OR dfn2.need_id IN ({$needsIds}))";
+                    // Updated condition to exclude "given" status
+                    $conditions[] = "((dfn.need_id IN ({$needsIds}) AND (dfn.status IS NULL OR dfn.status != 'given')) OR (dfn2.need_id IN ({$needsIds}) AND (dfn2.status IS NULL OR dfn2.status != 'given')))";
                 }
             }
 
             // Add other needs text search condition if provided
             if ($hasOtherNeedsFilter) {
                 $otherNeedsText = trim($request->input('other_needs'));
-                $conditions[] = "((n.name LIKE 'other%' AND n.name_ar LIKE ?) OR (n2.name LIKE 'other%' AND n2.name_ar LIKE ?))";
+                // Updated condition to exclude "given" status and search in custom needs
+                $conditions[] = "((n.name LIKE 'other_%' AND n.name_ar LIKE ? AND (dfn.status IS NULL OR dfn.status != 'given')) OR (n2.name LIKE 'other_%' AND n2.name_ar LIKE ? AND (dfn2.status IS NULL OR dfn2.status != 'given')))";
                 $bindings[] = "%{$otherNeedsText}%";
                 $bindings[] = "%{$otherNeedsText}%";
             }
@@ -107,17 +110,33 @@ class EntryController extends Controller
         if ($request->filled('needs_fulfilled') && $request->input('needs_fulfilled') !== 'all') {
             $isFulfilled = $request->input('needs_fulfilled') === 'fulfilled';
 
-            $query->whereRaw("
-                entries.id IN (
-                    SELECT DISTINCT e.id FROM entries e
-                    LEFT JOIN displaced_families df ON df.entry_id = e.id
-                    LEFT JOIN displaced_family_needs dfn ON dfn.displaced_family_id = df.id
-                    LEFT JOIN shelters s ON s.entry_id = e.id
-                    LEFT JOIN displaced_families df2 ON df2.shelter_id = s.id
-                    LEFT JOIN displaced_family_needs dfn2 ON dfn2.displaced_family_id = df2.id
-                    WHERE dfn.is_fulfilled = ? OR dfn2.is_fulfilled = ?
-                )
-            ", [$isFulfilled, $isFulfilled]);
+            if ($isFulfilled) {
+                // Show entries where needs are fulfilled OR given
+                $query->whereRaw("
+                    entries.id IN (
+                        SELECT DISTINCT e.id FROM entries e
+                        LEFT JOIN displaced_families df ON df.entry_id = e.id
+                        LEFT JOIN displaced_family_needs dfn ON dfn.displaced_family_id = df.id
+                        LEFT JOIN shelters s ON s.entry_id = e.id
+                        LEFT JOIN displaced_families df2 ON df2.shelter_id = s.id
+                        LEFT JOIN displaced_family_needs dfn2 ON dfn2.displaced_family_id = df2.id
+                        WHERE (dfn.is_fulfilled = ? OR dfn.status = 'given') OR (dfn2.is_fulfilled = ? OR dfn2.status = 'given')
+                    )
+                ", [true, true]);
+            } else {
+                // Show entries where needs are NOT fulfilled AND NOT given (pending)
+                $query->whereRaw("
+                    entries.id IN (
+                        SELECT DISTINCT e.id FROM entries e
+                        LEFT JOIN displaced_families df ON df.entry_id = e.id
+                        LEFT JOIN displaced_family_needs dfn ON dfn.displaced_family_id = df.id
+                        LEFT JOIN shelters s ON s.entry_id = e.id
+                        LEFT JOIN displaced_families df2 ON df2.shelter_id = s.id
+                        LEFT JOIN displaced_family_needs dfn2 ON dfn2.displaced_family_id = df2.id
+                        WHERE (dfn.is_fulfilled = ? AND (dfn.status IS NULL OR dfn.status = 'pending')) OR (dfn2.is_fulfilled = ? AND (dfn2.status IS NULL OR dfn2.status = 'pending'))
+                    )
+                ", [false, false]);
+            }
         }
 
         // Family size filter
@@ -161,13 +180,13 @@ class EntryController extends Controller
         // Get filter options - Include ALL needs (predefined + other)
         $allNeeds = Need::orderBy('name_ar')->get();
 
-        // Separate predefined and custom needs
+        // Separate predefined and custom needs based on your data structure
         $predefinedNeeds = $allNeeds->filter(function($need) {
-            return !str_starts_with($need->name, 'other');
+            return !str_starts_with($need->name, 'other_');
         })->values();
 
         $otherNeeds = $allNeeds->filter(function($need) {
-            return str_starts_with($need->name, 'other');
+            return str_starts_with($need->name, 'other_');
         })->values();
 
         // Combine both for the dropdown - predefined first, then other needs
@@ -225,7 +244,6 @@ class EntryController extends Controller
 
     public function show($id)
     {
-        // Get all models with their complete relationships
         $entry = Entry::with([
             'host',
             'displacedFamilies.needs',
@@ -233,30 +251,147 @@ class EntryController extends Controller
             'shelters.displacedFamilies.needs'
         ])->findOrFail($id);
 
-        // Get all needs for reference (useful for filtering/display)
-        $allNeeds = Need::with('displacedFamilies')->get();
+        // Collect all needs with their status from all families
+        $allNeedsCollection = collect();
+
+        // Add needs from direct families
+        foreach($entry->displacedFamilies as $family) {
+            foreach($family->needs as $need) {
+                $allNeedsCollection->push([
+                    'need_id' => $need->id,
+                    'need_name' => $need->name,
+                    'need_name_ar' => $need->name_ar,
+                    'status' => $need->pivot->status ?? 'pending',
+                    'is_fulfilled' => $need->pivot->is_fulfilled ?? false,
+                    'notes' => $need->pivot->notes ?? null,
+                ]);
+            }
+        }
+
+        // Add needs from shelter families
+        foreach($entry->shelters as $shelter) {
+            foreach($shelter->displacedFamilies as $family) {
+                foreach($family->needs as $need) {
+                    $allNeedsCollection->push([
+                        'need_id' => $need->id,
+                        'need_name' => $need->name,
+                        'need_name_ar' => $need->name_ar,
+                        'status' => $need->pivot->status ?? 'pending',
+                        'is_fulfilled' => $need->pivot->is_fulfilled ?? false,
+                        'notes' => $need->pivot->notes ?? null,
+                    ]);
+                }
+            }
+        }
+
+        // Group by need_id and aggregate status (if ANY family has it as 'given', mark as 'given')
+        $uniqueNeeds = $allNeedsCollection->groupBy('need_id')->map(function($needGroup, $needId) {
+            $firstNeed = $needGroup->first();
+            $hasGiven = $needGroup->contains('status', 'given') || $needGroup->contains('is_fulfilled', true);
+
+            return [
+                'id' => (int)$needId,
+                'name' => $firstNeed['need_name'],
+                'name_ar' => $firstNeed['need_name_ar'],
+                'pivot' => [
+                    'is_fulfilled' => $hasGiven,
+                    'status' => $hasGiven ? 'given' : 'pending',
+                    'notes' => null
+                ]
+            ];
+        })->values();
+
+        // Calculate statistics
+        $totalFamilies = $entry->displacedFamilies->count() +
+            $entry->shelters->sum(function($shelter) {
+                return $shelter->displacedFamilies->count();
+            });
+
+        $fulfilledNeeds = $uniqueNeeds->where('pivot.status', 'given')->count();
 
         return Inertia::render('Entries/Show', [
             'entry' => $entry,
-            'allNeeds' => $allNeeds,
-            // Additional statistics for context
+            'allNeeds' => $uniqueNeeds,
             'stats' => [
-                'total_displaced_families' => $entry->displacedFamilies->count() +
-                    $entry->shelters->sum(function($shelter) {
-                        return $shelter->displacedFamilies->count();
-                    }),
-                'total_needs' => $entry->displacedFamilies->pluck('needs')->flatten()
-                    ->merge($entry->shelters->pluck('displacedFamilies')->flatten()->pluck('needs')->flatten())
-                    ->unique('id')->count(),
-                'fulfilled_needs' => $entry->displacedFamilies->pluck('needs')->flatten()
-                    ->merge($entry->shelters->pluck('displacedFamilies')->flatten()->pluck('needs')->flatten())
-                    ->where('pivot.is_fulfilled', true)->count(),
+                'total_displaced_families' => $totalFamilies,
+                'total_needs' => $uniqueNeeds->count(),
+                'fulfilled_needs' => $fulfilledNeeds,
             ]
         ]);
     }
 
+
+
     public function export()
     {
         return Excel::download(new EntriesExport(Entry::query()), 'entries-' . now()->format('Y-m-d_H-i-s') . '.xlsx');
+    }
+
+    // Add notes update method
+    public function updateNotes(Request $request, $id)
+    {
+        $request->validate([
+            'notes' => 'nullable|string|max:1000'
+        ]);
+
+        $entry = Entry::findOrFail($id);
+        $entry->notes = $request->input('notes');
+        $entry->save();
+
+    }
+
+    // Add need status update method
+    public function updateNeedStatus(Request $request, $entryId, $familyId = null, $needId)
+    {
+        $request->validate([
+            'status' => 'required|in:pending,given',
+        ]);
+
+        $entry = Entry::with([
+            'displacedFamilies.needs',
+            'shelters.displacedFamilies.needs'
+        ])->findOrFail($entryId);
+
+        $updatedFamilies = 0;
+
+        // Update direct displaced families
+        foreach ($entry->displacedFamilies as $family) {
+            if ($family->needs->contains('id', $needId)) {
+                $family->needs()->updateExistingPivot($needId, [
+                    'status' => $request->status,
+                    'is_fulfilled' => $request->status === 'given',
+                    'updated_at' => now()
+                ]);
+                $updatedFamilies++;
+            }
+        }
+
+        // Update shelter families
+        foreach ($entry->shelters as $shelter) {
+            foreach ($shelter->displacedFamilies as $family) {
+                if ($family->needs->contains('id', $needId)) {
+                    $family->needs()->updateExistingPivot($needId, [
+                        'status' => $request->status,
+                        'is_fulfilled' => $request->status === 'given',
+                        'updated_at' => now()
+                    ]);
+                    $updatedFamilies++;
+                }
+            }
+        }
+
+        if ($updatedFamilies === 0) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No families found with this need'
+            ], 404);
+        }
+
+
+    }
+
+    public function exportNeeds()
+    {
+        return Excel::download(new NeedsExport(), 'needs-export-' . now()->format('Y-m-d_H-i-s') . '.xlsx');
     }
 }

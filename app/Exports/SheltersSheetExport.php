@@ -6,21 +6,32 @@ use App\Models\Shelter;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
+use Maatwebsite\Excel\Concerns\ShouldAutoSize;
+use Maatwebsite\Excel\Concerns\WithStyles;
+use Maatwebsite\Excel\Concerns\WithTitle;
+use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
-class SheltersSheetExport implements FromCollection, WithHeadings, WithMapping
+class SheltersSheetExport implements FromCollection, WithHeadings, WithMapping, ShouldAutoSize, WithStyles, WithTitle
 {
+    public function title(): string
+    {
+        return 'الملاجئ';
+    }
+
     public function collection()
     {
-        return Shelter::with('entry')->get();
+        return Shelter::with(['entry', 'displacedFamilies'])->get();
     }
 
     public function headings(): array
     {
         return [
-            'Entry ID',
-            'Place',
-            'Contact',
-            'Images',
+            'رقم الدخول الفريد',        // Entry ID
+            'رقم الدخول',             // Entry Number
+            'مكان الملجأ',             // Shelter Place
+            'جهة اتصال الملجأ',        // Shelter Contact
+            'عدد العائلات النازحة',      // Number of Displaced Families
+            'تاريخ الإنشاء',           // Created At
         ];
     }
 
@@ -28,9 +39,18 @@ class SheltersSheetExport implements FromCollection, WithHeadings, WithMapping
     {
         return [
             $shelter->entry_id,
-            $shelter->place ?? 'N/A',
-            $shelter->contact ?? 'N/A',
-            $shelter->images ?? 'N/A',
+            $shelter->entry->entry_number ?? 'غير محدد',
+            $shelter->place ?? 'غير محدد',
+            $shelter->contact ?? 'غير محدد',
+            $shelter->displacedFamilies->count(),
+            $shelter->created_at ? $shelter->created_at->format('Y-m-d H:i:s') : 'غير محدد',
+        ];
+    }
+
+    public function styles(Worksheet $sheet)
+    {
+        return [
+            1 => ['font' => ['bold' => true]],
         ];
     }
 }

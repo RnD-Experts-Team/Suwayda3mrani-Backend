@@ -8,7 +8,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Plus, Filter, RotateCcw, Eye, MapPin, FileText, Download, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
+import { Plus, Filter, RotateCcw, Eye, MapPin, FileText, Download, ChevronDown, ChevronLeft, ChevronRight, NotebookPen, Save } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import type { BreadcrumbItem } from '@/types';
 
@@ -25,6 +27,7 @@ interface Entry {
     location: string | null;
     status: string | null;
     date_submitted: string;
+    notes: string | null;
     hosted_families_count: number;
     martyrs_count: number;
     shelters_count: number;
@@ -84,7 +87,7 @@ export default function EntriesIndex({
             .filter(id => !isNaN(id));
     });
 
-    // Form state for filters - NEW
+    // Form state for filters
     const [formFilters, setFormFilters] = useState({
         entry_number: filters?.entry_number || '',
         submitter_name: filters?.submitter_name || '',
@@ -93,6 +96,19 @@ export default function EntriesIndex({
     });
 
     const [needsPopoverOpen, setNeedsPopoverOpen] = useState(false);
+
+    // Notes modal state
+    const [notesModal, setNotesModal] = useState<{
+        open: boolean;
+        entryId: number | null;
+        currentNotes: string;
+        tempNotes: string;
+    }>({
+        open: false,
+        entryId: null,
+        currentNotes: '',
+        tempNotes: ''
+    });
 
     // Safely get data with proper type guards
     const entriesData = Array.isArray(entries?.data) ? entries.data : [];
@@ -239,36 +255,119 @@ export default function EntriesIndex({
             return true;
         });
 
+    // Handle opening notes modal
+    const openNotesModal = (entry: Entry) => {
+        setNotesModal({
+            open: true,
+            entryId: entry.id,
+            currentNotes: entry.notes || '',
+            tempNotes: entry.notes || ''
+        });
+    };
+
+    // Handle closing notes modal
+    const closeNotesModal = () => {
+        setNotesModal({
+            open: false,
+            entryId: null,
+            currentNotes: '',
+            tempNotes: ''
+        });
+    };
+
+    // Handle saving notes
+    const saveNotes = () => {
+        if (notesModal.entryId) {
+            router.patch(`/form-entries/${notesModal.entryId}/notes`, {
+                notes: notesModal.tempNotes
+            }, {
+                preserveScroll: true,
+                preserveState: true,
+                onSuccess: () => {
+                    closeNotesModal();
+                }
+            });
+        }
+    };
+
+    // Function to truncate notes for display
+    const truncateNotes = (notes: string, maxLength: number = 60) => {
+        if (notes.length <= maxLength) return notes;
+        return notes.substring(0, maxLength) + '...';
+    };
+
+    // Generate pagination range with ellipsis
+    const generatePaginationRange = () => {
+        const currentPage = entries?.current_page ?? 1;
+        const lastPage = entries?.last_page ?? 1;
+        const delta = 2; // Number of pages to show before and after current page
+        const range: (number | string)[] = [];
+
+        // Always show first page
+        range.push(1);
+
+        // Add ellipsis if there's a gap after the first page
+        if (currentPage - delta > 2) {
+            range.push('...');
+        }
+
+        // Add pages around the current page
+        const start = Math.max(2, currentPage - delta);
+        const end = Math.min(lastPage - 1, currentPage + delta);
+
+        for (let i = start; i <= end; i++) {
+            range.push(i);
+        }
+
+        // Add ellipsis if there's a gap before the last page
+        if (currentPage + delta < lastPage - 1) {
+            range.push('...');
+        }
+
+        // Always show last page if more than one page
+        if (lastPage > 1) {
+            range.push(lastPage);
+        }
+
+        return range;
+    };
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Form Entries" />
 
-            <div className="flex h-full flex-1 flex-col gap-4 rounded-xl p-4 overflow-x-auto">
+            <div className="flex h-full flex-1 flex-col gap-4 overflow-x-auto rounded-xl p-4">
                 {/* Header */}
-                <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-center">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div className="space-y-1">
                         <h1 className="text-2xl font-bold tracking-tight">Form Entries</h1>
                         <p className="text-sm text-muted-foreground">
                             {isEmpty
-                                ? "No entries found"
-                                : `Showing ${entries?.from ?? 'N/A'}-${entries?.to ?? 'N/A'} of ${entries?.total ?? 0} entries`
-                            }
+                                ? 'No entries found'
+                                : `Showing ${entries?.from ?? 'N/A'}-${entries?.to ?? 'N/A'} of ${entries?.total ?? 0} entries`}
                         </p>
                     </div>
                     <div className="flex gap-2">
                         <a href="/form-entries/export">
                             <Button variant="secondary" className="gap-1">
-                                <Download className="h-4 w-4" /> Export
+                                <Download className="h-4 w-4" /> Export Entries
+                            </Button>
+                        </a>
+                        <a href="/needs/export">
+                            <Button variant="secondary" className="gap-1">
+                                <Download className="h-4 w-4" /> Export Needs
                             </Button>
                         </a>
                     </div>
+
+
                 </div>
 
                 {/* Filters with Manual Apply */}
                 <Card className="overflow-hidden">
-                    <CardContent className="p-4 space-y-4">
+                    <CardContent className="space-y-4 p-4">
                         {/* Filter Inputs Grid */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
+                        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-5">
                             <Input
                                 placeholder="Entry Number"
                                 value={formFilters.entry_number}
@@ -283,10 +382,7 @@ export default function EntriesIndex({
                                 className="w-full"
                             />
 
-                            <Select
-                                value={formFilters.location}
-                                onValueChange={(val) => handleFormChange('location', val)}
-                            >
+                            <Select value={formFilters.location} onValueChange={(val) => handleFormChange('location', val)}>
                                 <SelectTrigger>
                                     <SelectValue placeholder="Location" />
                                 </SelectTrigger>
@@ -298,10 +394,7 @@ export default function EntriesIndex({
                                 </SelectContent>
                             </Select>
 
-                            <Select
-                                value={formFilters.status}
-                                onValueChange={(val) => handleFormChange('status', val)}
-                            >
+                            <Select value={formFilters.status} onValueChange={(val) => handleFormChange('status', val)}>
                                 <SelectTrigger>
                                     <SelectValue placeholder="Status" />
                                 </SelectTrigger>
@@ -321,8 +414,7 @@ export default function EntriesIndex({
                                         <span>
                                             {selectedNeeds.length === 0
                                                 ? 'Select Needs'
-                                                : `${selectedNeeds.length} need${selectedNeeds.length > 1 ? 's' : ''} selected`
-                                            }
+                                                : `${selectedNeeds.length} need${selectedNeeds.length > 1 ? 's' : ''} selected`}
                                         </span>
                                         <ChevronDown className="h-4 w-4 opacity-50" />
                                     </Button>
@@ -330,12 +422,12 @@ export default function EntriesIndex({
                                 <PopoverContent className="w-80 p-4" align="start">
                                     <div className="space-y-4">
                                         <div className="space-y-2">
-                                            <h4 className="font-medium text-sm">Filter by Needs</h4>
-                                            <div className="space-y-3 max-h-60 overflow-y-auto">
+                                            <h4 className="text-sm font-medium">Filter by Needs</h4>
+                                            <div className="max-h-60 space-y-3 overflow-y-auto">
                                                 {/* Predefined Needs Section */}
                                                 {predefinedNeedsList.length > 0 && (
                                                     <div className="space-y-2">
-                                                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide border-b pb-1">
+                                                        <p className="border-b pb-1 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
                                                             Predefined Needs
                                                         </p>
                                                         {predefinedNeedsList.map((need) => (
@@ -343,11 +435,9 @@ export default function EntriesIndex({
                                                                 <Checkbox
                                                                     id={`need-${need.id}`}
                                                                     checked={selectedNeeds.includes(need.id)}
-                                                                    onCheckedChange={(checked) =>
-                                                                        handleNeedsChange(need.id, checked as boolean)
-                                                                    }
+                                                                    onCheckedChange={(checked) => handleNeedsChange(need.id, checked as boolean)}
                                                                 />
-                                                                <Label htmlFor={`need-${need.id}`} className="text-sm font-normal cursor-pointer">
+                                                                <Label htmlFor={`need-${need.id}`} className="cursor-pointer text-sm font-normal">
                                                                     {need.name_ar}
                                                                 </Label>
                                                             </div>
@@ -358,33 +448,30 @@ export default function EntriesIndex({
                                                 {/* Other Needs Section with "Select All" */}
                                                 {otherNeedsList.length > 0 && (
                                                     <div className="space-y-2">
-                                                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide border-b pb-1">
+                                                        <p className="border-b pb-1 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
                                                             Other Needs
                                                         </p>
-
                                                         {/* Select All Others Checkbox */}
-                                                        <div className="flex items-center space-x-2 bg-muted/50 p-2 rounded">
+                                                        <div className="flex items-center space-x-2 rounded bg-muted/50 p-2">
                                                             <Checkbox
                                                                 id="select-all-others"
-                                                                checked={otherNeedsList.every(need => selectedNeeds.includes(need.id))}
+                                                                checked={otherNeedsList.every((need) => selectedNeeds.includes(need.id))}
                                                                 onCheckedChange={(checked) => handleSelectAllOthers(checked as boolean)}
                                                             />
-                                                            <Label htmlFor="select-all-others" className="text-sm font-medium cursor-pointer">
+                                                            <Label htmlFor="select-all-others" className="cursor-pointer text-sm font-medium">
                                                                 Other (Select All)
                                                             </Label>
                                                         </div>
 
                                                         {/* Individual Other Needs */}
                                                         {otherNeedsList.map((need) => (
-                                                            <div key={need.id} className="flex items-center space-x-2 ml-4">
+                                                            <div key={need.id} className="ml-4 flex items-center space-x-2">
                                                                 <Checkbox
                                                                     id={`need-${need.id}`}
                                                                     checked={selectedNeeds.includes(need.id)}
-                                                                    onCheckedChange={(checked) =>
-                                                                        handleNeedsChange(need.id, checked as boolean)
-                                                                    }
+                                                                    onCheckedChange={(checked) => handleNeedsChange(need.id, checked as boolean)}
                                                                 />
-                                                                <Label htmlFor={`need-${need.id}`} className="text-sm font-normal cursor-pointer">
+                                                                <Label htmlFor={`need-${need.id}`} className="cursor-pointer text-sm font-normal">
                                                                     {need.name_ar}
                                                                 </Label>
                                                             </div>
@@ -400,11 +487,9 @@ export default function EntriesIndex({
                                                                 <Checkbox
                                                                     id={`need-${need.id}`}
                                                                     checked={selectedNeeds.includes(need.id)}
-                                                                    onCheckedChange={(checked) =>
-                                                                        handleNeedsChange(need.id, checked as boolean)
-                                                                    }
+                                                                    onCheckedChange={(checked) => handleNeedsChange(need.id, checked as boolean)}
                                                                 />
-                                                                <Label htmlFor={`need-${need.id}`} className="text-sm font-normal cursor-pointer">
+                                                                <Label htmlFor={`need-${need.id}`} className="cursor-pointer text-sm font-normal">
                                                                     {need.name_ar}
                                                                 </Label>
                                                             </div>
@@ -420,11 +505,7 @@ export default function EntriesIndex({
 
                         {/* Action Buttons */}
                         <div className="flex gap-2 pt-2">
-                            <Button
-                                onClick={() => applyFilters()}
-                                className="gap-1"
-                                disabled={!hasFormChanges()}
-                            >
+                            <Button onClick={() => applyFilters()} className="gap-1" disabled={!hasFormChanges()}>
                                 <Filter className="h-4 w-4" /> Apply Filters
                             </Button>
                             <Button variant="outline" onClick={resetFilters} className="gap-1">
@@ -442,7 +523,7 @@ export default function EntriesIndex({
                                 Entry: {filters.entry_number}
                                 <button
                                     onClick={() => {
-                                        setFormFilters(prev => ({...prev, entry_number: ''}));
+                                        setFormFilters((prev) => ({ ...prev, entry_number: '' }));
                                         applyFilters({ entry_number: '' });
                                     }}
                                     className="ml-1 text-xs hover:text-red-500"
@@ -457,7 +538,7 @@ export default function EntriesIndex({
                                 Submitter: {filters.submitter_name}
                                 <button
                                     onClick={() => {
-                                        setFormFilters(prev => ({...prev, submitter_name: ''}));
+                                        setFormFilters((prev) => ({ ...prev, submitter_name: '' }));
                                         applyFilters({ submitter_name: '' });
                                     }}
                                     className="ml-1 text-xs hover:text-red-500"
@@ -472,7 +553,7 @@ export default function EntriesIndex({
                                 Location: {filters.location}
                                 <button
                                     onClick={() => {
-                                        setFormFilters(prev => ({...prev, location: 'all'}));
+                                        setFormFilters((prev) => ({ ...prev, location: 'all' }));
                                         applyFilters({ location: '' });
                                     }}
                                     className="ml-1 text-xs hover:text-red-500"
@@ -487,7 +568,7 @@ export default function EntriesIndex({
                                 Status: {filters.status}
                                 <button
                                     onClick={() => {
-                                        setFormFilters(prev => ({...prev, status: 'all'}));
+                                        setFormFilters((prev) => ({ ...prev, status: 'all' }));
                                         applyFilters({ status: '' });
                                     }}
                                     className="ml-1 text-xs hover:text-red-500"
@@ -503,9 +584,9 @@ export default function EntriesIndex({
                                 {needName}
                                 <button
                                     onClick={() => {
-                                        const needToRemove = needsList.find(n => n.name_ar === needName);
+                                        const needToRemove = needsList.find((n) => n.name_ar === needName);
                                         if (needToRemove) {
-                                            const updatedNeeds = selectedNeeds.filter(id => id !== needToRemove.id);
+                                            const updatedNeeds = selectedNeeds.filter((id) => id !== needToRemove.id);
                                             setSelectedNeeds(updatedNeeds);
                                             applyFilters({ needs: updatedNeeds });
                                         }
@@ -527,9 +608,7 @@ export default function EntriesIndex({
                                 <FileText className="h-6 w-6 text-muted-foreground" />
                             </div>
                             <h3 className="mt-3 text-lg font-medium">No entries found</h3>
-                            <p className="mt-1 text-sm text-muted-foreground">
-                                Adjust your filters to see results
-                            </p>
+                            <p className="mt-1 text-sm text-muted-foreground">Adjust your filters to see results</p>
                             <div className="mt-4 flex justify-center gap-3">
                                 <Button variant="outline" onClick={resetFilters}>
                                     <RotateCcw className="mr-2 h-4 w-4" /> Reset filters
@@ -538,17 +617,15 @@ export default function EntriesIndex({
                         </CardContent>
                     </Card>
                 ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
                         {entriesData.map((entry) => (
-                            <Card key={entry.id} className="h-full flex flex-col hover:shadow-md transition-shadow">
-                                <CardContent className="p-4 flex-1 flex flex-col">
-                                    <div className="space-y-3 flex-1">
-                                        <div className="flex justify-between items-start gap-2">
+                            <Card key={entry.id} className="flex h-full flex-col transition-shadow hover:shadow-md">
+                                <CardContent className="flex flex-1 flex-col p-4">
+                                    <div className="flex-1 space-y-3">
+                                        <div className="flex items-start justify-between gap-2">
                                             <div>
-                                                <h3 className="font-semibold leading-tight">Entry #{entry.entry_number}</h3>
-                                                <p className="text-sm text-muted-foreground">
-                                                    {entry.submitter_name || 'No submitter'}
-                                                </p>
+                                                <h3 className="leading-tight font-semibold">Entry #{entry.entry_number}</h3>
+                                                <p className="text-sm text-muted-foreground">{entry.submitter_name || 'No submitter'}</p>
                                             </div>
                                             {entry.status && (
                                                 <div className="flex flex-wrap gap-1">
@@ -586,14 +663,29 @@ export default function EntriesIndex({
                                                 <p>{entry.shelters_count}</p>
                                             </div>
                                         </div>
+
+                                        {/* Notes Display - Fixed */}
+                                        {entry.notes && (
+                                            <p className="text-white-800 text-sm break-words">
+                                                <strong>Notes:</strong> {truncateNotes(entry.notes)}
+                                            </p>
+                                        )}
                                     </div>
 
-                                    <div className="mt-4 pt-3 border-t">
+                                    <div className="mt-4 space-y-3 border-t pt-3">
+                                        {' '}
+                                        {/* Increased space-y from 2 to 3 */}
                                         <Link href={`/form-entries/${entry.id}`} className="w-full">
-                                            <Button variant="default" className="w-full gap-2">
+                                            <Button variant="default" className="mb-2 w-full gap-2">
+                                                {' '}
+                                                {/* Added mb-2 (margin-bottom) */}
                                                 <Eye className="h-4 w-4" /> View Details
                                             </Button>
                                         </Link>
+                                        <Button variant="outline" className="w-full gap-2" onClick={() => openNotesModal(entry)}>
+                                            <NotebookPen className="h-4 w-4" />
+                                            {entry.notes ? 'Edit Notes' : 'Add Notes'}
+                                        </Button>
                                     </div>
                                 </CardContent>
                             </Card>
@@ -607,67 +699,103 @@ export default function EntriesIndex({
                         <div className="text-sm text-muted-foreground">
                             Page {entries?.current_page ?? 1} of {entries?.last_page ?? 1} ({entries?.total ?? 0} total entries)
                         </div>
+                        <div className="flex flex-wrap justify-center gap-1">
+                            {/* Previous Button */}
+                            <Button
+                                variant="outline"
+                                onClick={() => handlePaginationClick(paginationLinks.find((link) => link.label.includes('Previous'))?.url)}
+                                disabled={!paginationLinks.find((link) => link.label.includes('Previous'))?.url}
+                                className="gap-1"
+                            >
+                                <ChevronLeft className="h-4 w-4" /> Previous
+                            </Button>
 
-                        <div className="flex gap-1 flex-wrap justify-center">
-                            {paginationLinks.map((link, index) => {
-                                if (!link.url) {
-                                    if (link.label.includes('Previous')) {
-                                        return (
-                                            <Button key={index} variant="outline" disabled className="gap-1">
-                                                <ChevronLeft className="h-4 w-4" /> Previous
-                                            </Button>
-                                        );
-                                    }
-                                    if (link.label.includes('Next')) {
-                                        return (
-                                            <Button key={index} variant="outline" disabled className="gap-1">
-                                                Next <ChevronRight className="h-4 w-4" />
-                                            </Button>
-                                        );
-                                    }
-                                    return null;
-                                }
-
-                                if (link.label.includes('Previous')) {
+                            {/* Page Numbers with Ellipsis */}
+                            {generatePaginationRange().map((page, index) => {
+                                if (page === '...') {
                                     return (
-                                        <Button
-                                            key={index}
-                                            variant="outline"
-                                            onClick={() => handlePaginationClick(link.url)}
-                                            className="gap-1"
-                                        >
-                                            <ChevronLeft className="h-4 w-4" /> Previous
+                                        <Button key={`ellipsis-${index}`} variant="outline" disabled className="min-w-[40px]">
+                                            ...
                                         </Button>
                                     );
                                 }
 
-                                if (link.label.includes('Next')) {
-                                    return (
-                                        <Button
-                                            key={index}
-                                            variant="outline"
-                                            onClick={() => handlePaginationClick(link.url)}
-                                            className="gap-1"
-                                        >
-                                            Next <ChevronRight className="h-4 w-4" />
-                                        </Button>
-                                    );
-                                }
-
+                                const pageLink = paginationLinks.find((link) => parseInt(link.label) === page);
                                 return (
                                     <Button
-                                        key={index}
-                                        variant={link.active ? 'default' : 'outline'}
-                                        onClick={() => handlePaginationClick(link.url)}
+                                        key={page}
+                                        variant={page === entries?.current_page ? 'default' : 'outline'}
+                                        onClick={() => handlePaginationClick(pageLink?.url || null)}
                                         className="min-w-[40px]"
+                                        disabled={!pageLink?.url}
                                     >
-                                        {link.label}
+                                        {page}
                                     </Button>
                                 );
                             })}
+
+                            {/* Next Button */}
+                            <Button
+                                variant="outline"
+                                onClick={() => handlePaginationClick(paginationLinks.find((link) => link.label.includes('Next'))?.url)}
+                                disabled={!paginationLinks.find((link) => link.label.includes('Next'))?.url}
+                                className="gap-1"
+                            >
+                                Next <ChevronRight className="h-4 w-4" />
+                            </Button>
                         </div>
                     </div>
                 )}
+
+                {/* Notes Modal - Fixed for proper text wrapping without scroll */}
+                <Dialog open={notesModal.open} onOpenChange={closeNotesModal}>
+                    <DialogContent className="flex max-h-[90vh] flex-col sm:max-w-[600px]">
+                        <DialogHeader className="flex-shrink-0">
+                            <DialogTitle className="flex items-center gap-2">
+                                <NotebookPen className="h-5 w-5" />
+                                {notesModal.currentNotes ? 'Edit Notes' : 'Add Notes'}
+                            </DialogTitle>
+                        </DialogHeader>
+                        <div className="flex-1 space-y-4 overflow-hidden">
+                            <div className="space-y-2">
+                                <Label htmlFor="notes-textarea" className="text-sm font-medium">
+                                    Notes
+                                </Label>
+                                <Textarea
+                                    id="notes-textarea"
+                                    placeholder="Enter your notes here..."
+                                    value={notesModal.tempNotes}
+                                    onChange={(e) =>
+                                        setNotesModal((prev) => ({
+                                            ...prev,
+                                            tempNotes: e.target.value,
+                                        }))
+                                    }
+                                    rows={10}
+                                    className="w-full resize-none overflow-y-auto"
+                                    style={{
+                                        whiteSpace: 'pre-wrap',
+                                        wordBreak: 'break-word',
+                                        overflowWrap: 'break-word',
+                                        lineHeight: '1.5',
+                                        minHeight: '200px',
+                                        maxHeight: '400px',
+                                    }}
+                                />
+                                <p className="text-xs text-gray-500">{notesModal.tempNotes.length} characters</p>
+                            </div>
+                        </div>
+                        <div className="flex flex-shrink-0 justify-end gap-2 border-t pt-4">
+                            <Button variant="outline" onClick={closeNotesModal}>
+                                Cancel
+                            </Button>
+                            <Button onClick={saveNotes} className="gap-2">
+                                <Save className="h-4 w-4" />
+                                Save Notes
+                            </Button>
+                        </div>
+                    </DialogContent>
+                </Dialog>
             </div>
         </AppLayout>
     );

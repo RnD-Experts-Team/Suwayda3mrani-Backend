@@ -46,12 +46,12 @@ Route::middleware(['auth'])->group(function () {
     Route::patch('timeline-events/{timelineEvent}/toggle-highlighted', [TimelineEventController::class, 'toggleHighlighted'])->name('timeline-events.toggle-highlighted');
     Route::resource('home-sections', HomeSectionController::class);
     Route::post('/home-sections/bulk-delete', [HomeSectionController::class, 'bulkDelete'])->name('home-sections.bulk-delete');
+    Route::get('/needs/export', [EntryController::class, 'exportNeeds'])->name('needs.export');
+    Route::patch('/form-entries/{entry}/families/{family}/needs/{need}/status', [EntryController::class, 'updateNeedStatus'])->name('entries.update-need-status');
+    Route::patch('/form-entries/{entry}/notes', [EntryController::class, 'updateNotes'])->name('entries.update-notes');
     Route::get('/form-entries/export', [EntryController::class, 'export'])->name('entries.export');
     Route::get('/form-entries', [EntryController::class, 'index'])->name('entries.index');
     Route::get('/form-entries/{entry}', [EntryController::class, 'show'])->name('entries.show');
-
-
-
 });
 require __DIR__.'/settings.php';
 require __DIR__.'/auth.php';

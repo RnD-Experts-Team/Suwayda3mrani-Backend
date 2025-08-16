@@ -8,10 +8,16 @@ use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 use Maatwebsite\Excel\Concerns\WithStyles;
+use Maatwebsite\Excel\Concerns\WithTitle;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
-class HostsSheetExport implements FromCollection, WithHeadings, WithMapping, ShouldAutoSize, WithStyles
+class HostsSheetExport implements FromCollection, WithHeadings, WithMapping, ShouldAutoSize, WithStyles, WithTitle
 {
+    public function title(): string
+    {
+        return 'المضيفين';
+    }
+
     public function collection()
     {
         return Host::with('entry')->get();
@@ -20,17 +26,17 @@ class HostsSheetExport implements FromCollection, WithHeadings, WithMapping, Sho
     public function headings(): array
     {
         return [
-            'Entry ID',
-            'Entry Number',
-            'Full Name',
-            'Family Count',
-            'Location',
-            'Address',
-            'Phone',
-            'Children Under 8 Months',
-            'Birth Details',
-            'Family Book Number',
-            'Created At',
+            'رقم الدخول الفريد',        // Entry ID
+            'رقم الدخول',             // Entry Number
+            'الاسم الكامل للمضيف',     // Full Name
+            'عدد أفراد عائلة المضيف',   // Family Count
+            'مكان المضيف',            // Location
+            'عنوان المضيف',           // Address
+            'رقم هاتف المضيف',        // Phone
+            'أطفال دون 8 أشهر لدى المضيف', // Children Under 8 Months
+            'تفاصيل الولادة',          // Birth Details
+            'رقم دفتر العائلة',        // Family Book Number
+            'تاريخ الإنشاء',           // Created At
         ];
     }
 
@@ -38,16 +44,16 @@ class HostsSheetExport implements FromCollection, WithHeadings, WithMapping, Sho
     {
         return [
             $host->entry_id,
-            $host->entry->entry_number ?? 'N/A',
-            $host->full_name ?? 'N/A',
-            $host->family_count ?? 0,
-            $host->location ?? 'N/A',
-            $host->address ?? 'N/A',
-            $host->phone ?? 'N/A',
+            $host->entry->entry_number ?? 'غير محدد',
+            $host->full_name ?? 'غير محدد',
+            $this->formatText($host->family_count) ?: 0,
+            $host->location ?? 'غير محدد',
+            $host->address ?? 'غير محدد',
+            $host->phone ?? 'غير محدد',
             $this->translateBoolean($host->children_under_8_months),
             $this->formatText($host->birth_details),
-            $host->family_book_number ?? 'N/A',
-            $host->created_at->format('Y-m-d H:i:s'),
+            $host->family_book_number ?? 'غير محدد',
+            $host->created_at ? $host->created_at->format('Y-m-d H:i:s') : 'غير محدد',
         ];
     }
 
@@ -60,15 +66,15 @@ class HostsSheetExport implements FromCollection, WithHeadings, WithMapping, Sho
 
     private function translateBoolean($value): string
     {
-        if ($value === 'نعم') return 'Yes';
-        if ($value === 'لا') return 'No';
-        return $value ?? 'N/A';
+        if ($value === 'نعم') return 'نعم';
+        if ($value === 'لا') return 'لا';
+        return $value ?? 'غير محدد';
     }
 
     private function formatText($text): string
     {
         if (empty($text)) {
-            return 'N/A';
+            return 'غير محدد';
         }
         return str_replace(["\n", "\r"], ' ', $text);
     }
