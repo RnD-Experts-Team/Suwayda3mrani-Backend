@@ -15,7 +15,7 @@ class Need extends Model
     public function displacedFamilies(): BelongsToMany
     {
         return $this->belongsToMany(DisplacedFamily::class, 'displaced_family_needs')
-            ->withPivot(['is_fulfilled', 'notes'])
+            ->withPivot(['is_fulfilled', 'status', 'notes']) // Added 'status' here
             ->withTimestamps();
     }
 }

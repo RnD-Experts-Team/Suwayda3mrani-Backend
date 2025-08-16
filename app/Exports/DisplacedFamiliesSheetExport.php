@@ -8,10 +8,16 @@ use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 use Maatwebsite\Excel\Concerns\WithStyles;
+use Maatwebsite\Excel\Concerns\WithTitle;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
-class DisplacedFamiliesSheetExport implements FromCollection, WithHeadings, WithMapping, ShouldAutoSize, WithStyles
+class DisplacedFamiliesSheetExport implements FromCollection, WithHeadings, WithMapping, ShouldAutoSize, WithStyles, WithTitle
 {
+    public function title(): string
+    {
+        return 'العائلات النازحة';
+    }
+
     public function collection()
     {
         return DisplacedFamily::with(['shelter.entry', 'entry', 'needs'])
@@ -22,27 +28,27 @@ class DisplacedFamiliesSheetExport implements FromCollection, WithHeadings, With
     public function headings(): array
     {
         return [
-            'ID',
-            'Associated With',
-            'Entry Number',
-            'Shelter Location',
-            'Individuals Count',
-            'Family Head Contact',
-            'Wife Name',
-            'Children Info',
-            'Family Needs',
-            'Needs Status',
-            'Assistance Type',
-            'Assistance Provider',
-            'Date Received',
-            'Return Possible?',
-            'Previous Assistance?',
-            'Family Book Number',
-            'Children Under 8 Months',
-            'Birth Details',
-            'Notes',
-            'Created At',
-            'Images Count',
+            'رقم العائلة',             // Family ID
+            'مرتبطة بـ',               // Associated With
+            'رقم الدخول',             // Entry Number
+            'مكان الملجأ',             // Shelter Location
+            'عدد أفراد العائلة',        // Individuals Count
+            'جهة اتصال رب العائلة',     // Family Head Contact
+            'اسم الزوجة',              // Wife Name
+            'معلومات الأطفال',         // Children Info
+            'احتياجات العائلة',         // Family Needs
+            'حالة الاحتياجات',          // Needs Status
+            'نوع المساعدة',            // Assistance Type
+            'مقدم المساعدة',           // Assistance Provider
+            'تاريخ استلام المساعدة',     // Date Received
+            'إمكانية العودة',          // Return Possible?
+            'مساعدة سابقة',            // Previous Assistance?
+            'رقم دفتر العائلة',        // Family Book Number
+            'أطفال دون 8 أشهر',        // Children Under 8 Months
+            'تفاصيل الولادة',          // Birth Details
+            'ملاحظات',               // Notes
+            'تاريخ الإنشاء',           // Created At
+            'عدد الصور',              // Images Count
         ];
     }
 
@@ -50,25 +56,25 @@ class DisplacedFamiliesSheetExport implements FromCollection, WithHeadings, With
     {
         return [
             $family->id,
-            $family->shelter_id ? 'Shelter' : ($family->entry_id ? 'Entry' : 'N/A'),
-            $family->shelter->entry->entry_number ?? ($family->entry->entry_number ?? 'N/A'),
-            $family->shelter->place ?? 'N/A',
-            $family->individuals_count ?? 'N/A',
-            $family->contact ?? 'N/A',
-            $family->wife_name ?? 'N/A',
+            $family->shelter_id ? 'ملجأ' : ($family->entry_id ? 'دخول مباشر' : 'غير محدد'),
+            $family->shelter->entry->entry_number ?? ($family->entry->entry_number ?? 'غير محدد'),
+            $family->shelter->place ?? 'غير محدد',
+            $family->individuals_count ?? 'غير محدد',
+            $family->contact ?? 'غير محدد',
+            $family->wife_name ?? 'غير محدد',
             $this->formatText($family->children_info),
             $this->formatNeeds($family->needs),
             $this->formatNeedsStatus($family->needs),
-            $family->assistance_type ?? 'N/A',
-            $family->provider ?? 'N/A',
-            $family->date_received ?? 'N/A',
+            $family->assistance_type ?? 'غير محدد',
+            $family->provider ?? 'غير محدد',
+            $family->date_received ?? 'غير محدد',
             $this->translateBoolean($family->return_possible),
             $this->translateBoolean($family->previous_assistance),
-            $family->family_book_number ?? 'N/A',
+            $family->family_book_number ?? 'غير محدد',
             $this->translateBoolean($family->children_under_8_months),
             $this->formatText($family->birth_details),
             $this->formatText($family->notes),
-            $family->created_at->format('Y-m-d H:i:s'),
+            $family->created_at ? $family->created_at->format('Y-m-d H:i:s') : 'غير محدد',
             $this->countImages($family->images),
         ];
     }
@@ -83,7 +89,7 @@ class DisplacedFamiliesSheetExport implements FromCollection, WithHeadings, With
     private function formatText($text): string
     {
         if (empty($text)) {
-            return 'N/A';
+            return 'غير محدد';
         }
         return str_replace(["\n", "\r"], ' ', $text);
     }
@@ -91,32 +97,32 @@ class DisplacedFamiliesSheetExport implements FromCollection, WithHeadings, With
     private function formatNeeds($needs): string
     {
         if (!$needs || $needs->isEmpty()) {
-            return 'N/A';
+            return 'غير محدد';
         }
 
-        return $needs->pluck('name_ar')->implode(', ');
+        return $needs->pluck('name_ar')->implode('، ');
     }
 
     private function formatNeedsStatus($needs): string
     {
         if (!$needs || $needs->isEmpty()) {
-            return 'N/A';
+            return 'غير محدد';
         }
 
         $status = [];
         foreach ($needs as $need) {
-            $fulfilled = $need->pivot->is_fulfilled ? 'Fulfilled' : 'Pending';
+            $fulfilled = $need->pivot->is_fulfilled ? 'مُلبى' : 'معلق';
             $status[] = $need->name_ar . ': ' . $fulfilled;
         }
 
-        return implode('; ', $status);
+        return implode('؛ ', $status);
     }
 
     private function translateBoolean($value): string
     {
-        if ($value === 'نعم') return 'Yes';
-        if ($value === 'لا') return 'No';
-        return $value ?? 'N/A';
+        if ($value === 'نعم') return 'نعم';
+        if ($value === 'لا') return 'لا';
+        return $value ?? 'غير محدد';
     }
 
     private function countImages($images): int

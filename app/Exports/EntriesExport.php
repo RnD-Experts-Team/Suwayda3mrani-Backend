@@ -9,11 +9,11 @@ class EntriesExport implements WithMultipleSheets
     public function sheets(): array
     {
         return [
-            'Entries' => new EntriesSheetExport(),
-            'Hosts' => new HostsSheetExport(),
-            'Martyrs' => new MartyrsSheetExport(),
-            'Shelters' => new SheltersSheetExport(),
-            'Displaced Families' => new DisplacedFamiliesSheetExport(),
+            'الدخولات' => new EntriesSheetExport(),           // Entries
+            'المضيفين' => new HostsSheetExport(),             // Hosts
+            'الشهداء' => new MartyrsSheetExport(),            // Martyrs
+            'الملاجئ' => new SheltersSheetExport(),           // Shelters
+            'العائلات النازحة' => new DisplacedFamiliesSheetExport(), // Displaced Families
         ];
     }
 }
