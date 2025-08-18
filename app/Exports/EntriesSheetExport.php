@@ -7,11 +7,17 @@ use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
-use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use Maatwebsite\Excel\Concerns\WithStyles;
+use Maatwebsite\Excel\Concerns\WithTitle;
+use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
-class EntriesSheetExport implements FromCollection, WithHeadings, WithMapping, ShouldAutoSize, WithStyles
+class EntriesSheetExport implements FromCollection, WithHeadings, WithMapping, ShouldAutoSize, WithStyles, WithTitle
 {
+    public function title(): string
+    {
+        return 'الدخولات';
+    }
+
     public function collection()
     {
         return Entry::with([
@@ -25,22 +31,23 @@ class EntriesSheetExport implements FromCollection, WithHeadings, WithMapping, S
     public function headings(): array
     {
         return [
-            'Entry ID',
-            'Entry Number',
-            'Submitter Name',
-            'Location',
-            'Status',
-            'Date Submitted',
-            'Host Name',
-            'Host Family Count',
-            'Host Location',
-            'Host Children Under 8 Months',
-            'Displaced Families Count',
-            'Total Needs Count',
-            'Unique Needs Types',
-            'Martyrs Count',
-            'Shelters Count',
-            'Internal Link',
+            'رقم الدخول الفريد',        // Entry ID
+            'رقم الدخول',             // Entry Number
+            'اسم المرسل',              // Submitter Name
+            'الموقع',                 // Location
+            'الحالة',                 // Status
+            'تاريخ الإرسال',           // Date Submitted
+            'اسم المضيف',             // Host Name
+            'عدد أفراد عائلة المضيف',   // Host Family Count
+            'مكان المضيف',            // Host Location
+            'أطفال دون 8 أشهر لدى المضيف', // Host Children Under 8 Months
+            'عدد العائلات النازحة',      // Displaced Families Count
+            'إجمالي عدد الاحتياجات',     // Total Needs Count
+            'أنواع الاحتياجات',         // Unique Needs Types
+            'عدد الشهداء',             // Martyrs Count
+            'عدد الملاجئ',             // Shelters Count
+            'الرابط الداخلي',          // Internal Link
+            'تاريخ الإنشاء',           // Created At
         ];
     }
 
@@ -66,22 +73,23 @@ class EntriesSheetExport implements FromCollection, WithHeadings, WithMapping, S
         return [
             $entry->id,
             $entry->entry_number,
-            $entry->submitter_name,
-            $entry->location,
-            $entry->status,
-            $entry->date_submitted,
-            $entry->host->full_name ?? 'N/A',
-            $entry->host->family_count ?? 'N/A',
-            $entry->host->location ?? 'N/A',
+            $entry->submitter_name ?? 'غير محدد',
+            $entry->location ?? 'غير محدد',
+            $entry->status ?? 'غير محدد',
+            $entry->date_submitted ? $entry->date_submitted->format('Y-m-d H:i:s') : 'غير محدد',
+            $entry->host->full_name ?? 'غير محدد',
+            $this->formatText($entry->host->family_count ?? 'غير محدد'),
+            $entry->host->location ?? 'غير محدد',
             $this->translateBoolean($entry->host->children_under_8_months ?? null),
             $entry->displacedFamilies->count() + $entry->shelters->sum(function($shelter) {
                 return $shelter->displacedFamilies->count();
             }),
             $allNeeds->count(),
-            $uniqueNeeds->implode(', ') ?: 'N/A',
+            $uniqueNeeds->implode('، ') ?: 'غير محدد',
             $entry->martyrs->count(),
             $entry->shelters->count(),
-            $entry->InternalLink,
+            $entry->InternalLink ?? 'غير محدد',
+            $entry->created_at ? $entry->created_at->format('Y-m-d H:i:s') : 'غير محدد',
         ];
     }
 
@@ -94,8 +102,16 @@ class EntriesSheetExport implements FromCollection, WithHeadings, WithMapping, S
 
     private function translateBoolean($value): string
     {
-        if ($value === 'نعم') return 'Yes';
-        if ($value === 'لا') return 'No';
-        return $value ?? 'N/A';
+        if ($value === 'نعم') return 'نعم';
+        if ($value === 'لا') return 'لا';
+        return $value ?? 'غير محدد';
+    }
+
+    private function formatText($text): string
+    {
+        if (empty($text)) {
+            return 'غير محدد';
+        }
+        return str_replace(["\n", "\r"], ' ', $text);
     }
 }

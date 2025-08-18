@@ -15,7 +15,8 @@ class Entry extends Model
         'submitter_name',
         'location',
         'status',
-        'InternalLink'
+        'InternalLink',
+        'notes'
     ];
 
     protected $casts = [
