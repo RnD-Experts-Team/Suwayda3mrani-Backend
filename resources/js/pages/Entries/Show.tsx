@@ -194,6 +194,8 @@ function renderBooleanField(value: string | null): string {
     return value || 'N/A';
 }
 
+
+
 function NeedItem({ need, familyId, entryId }: {
     need: Need,
     familyId: number,
@@ -368,6 +370,8 @@ export default function Show({ entry, allNeeds, stats }: Props) {
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [copiedField, setCopiedField] = useState<string | null>(null);
 
+    const displacedFamilies = (entry as any).displacedFamilies ?? (entry as any).displaced_families ?? [];
+
     const handleDelete = () => {
         setDeleteDialogOpen(true);
     };
@@ -497,58 +501,61 @@ export default function Show({ entry, allNeeds, stats }: Props) {
                         )}
 
                         {/* Displaced Families */}
-                        {entry.displacedFamilies && entry.displacedFamilies.length > 0 && (
-                            <Card>
-                                <CardHeader className="border-b">
-                                    <CardTitle className="text-lg font-semibold">Displaced Families ({entry.displacedFamilies.length})</CardTitle>
-                                </CardHeader>
-                                <CardContent className="p-6 space-y-6">
-                                    {entry.displacedFamilies.map((family, index) => (
-                                        <Card key={family.id} className="border">
-                                            <CardHeader className="bg-muted">
-                                                <CardTitle className="text-md">Family {index + 1}</CardTitle>
-                                            </CardHeader>
-                                            <CardContent className="p-6">
-                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                                    <div className="space-y-4">
-                                                        {renderField('Individuals Count', family.individuals_count)}
-                                                        {renderField('Contact', family.contact)}
-                                                        {renderField('Wife Name', family.wife_name)}
-                                                        {renderField('Children Info', family.children_info)}
-                                                        {renderField('Family Book Number', family.family_book_number)}
-                                                        {renderField('Assistance Type', family.assistance_type)}
-                                                        {renderField('Provider', family.provider)}
-                                                        {renderField('Date Received', family.date_received)}
-                                                    </div>
-                                                    <div className="space-y-4">
-                                                        {renderField('Return Possible', renderBooleanField(family.return_possible))}
-                                                        {renderField('Previous Assistance', renderBooleanField(family.previous_assistance))}
-                                                        {renderField('Children Under 8 Months', renderBooleanField(family.children_under_8_months))}
-                                                        {family.children_under_8_months === 'نعم' && renderField('Birth Details', family.birth_details)}
-                                                        {family.images && (
-                                                            <div className="flex justify-between items-start py-2">
-                                                                <span className="text-sm font-medium text-muted-foreground">Images</span>
-                                                                <div>{renderImageLinks(family.images)}</div>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                                {/* Family notes */}
-                                                {family.notes && (
-                                                    <div className="mt-4">
-                                                        {renderNotesField('Family Notes', family.notes)}
+                {displacedFamilies && displacedFamilies.length > 0 && (
+                    <Card>
+                        <CardHeader className="border-b">
+                            <CardTitle className="text-lg font-semibold">
+                                Displaced Families ({displacedFamilies.length})
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-6 space-y-6">
+                            {displacedFamilies.map((family: any, index: number) => (
+                                <Card key={family.id} className="border">
+                                    <CardHeader className="bg-muted">
+                                        <CardTitle className="text-md">Family {index + 1}</CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="p-6">
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                            <div className="space-y-4">
+                                                {renderField('Individuals Count', family.individuals_count)}
+                                                {renderField('Contact', family.contact)}
+                                                {renderField('Wife Name', family.wife_name)}
+                                                {renderField('Children Info', family.children_info)}
+                                                {renderField('Family Book Number', family.family_book_number)}
+                                                {renderField('Assistance Type', family.assistance_type)}
+                                                {renderField('Provider', family.provider)}
+                                                {renderField('Date Received', family.date_received)}
+                                            </div>
+                                            <div className="space-y-4">
+                                                {renderField('Return Possible', renderBooleanField(family.return_possible))}
+                                                {renderField('Previous Assistance', renderBooleanField(family.previous_assistance))}
+                                                {renderField('Children Under 8 Months', renderBooleanField(family.children_under_8_months))}
+                                                {family.children_under_8_months === 'نعم' &&
+                                                    renderField('Birth Details', family.birth_details)}
+                                                {family.images && (
+                                                    <div className="flex justify-between items-start py-2">
+                                                        <span className="text-sm font-medium text-muted-foreground">Images</span>
+                                                        <div>{renderImageLinks(family.images)}</div>
                                                     </div>
                                                 )}
-                                                <div className="mt-6">
-                                                    <h4 className="text-sm font-medium text-muted-foreground mb-3">Current Needs</h4>
-                                                    {renderNeeds(family.needs, family.id, entry.id)}
-                                                </div>
-                                            </CardContent>
-                                        </Card>
-                                    ))}
-                                </CardContent>
-                            </Card>
-                        )}
+                                            </div>
+                                        </div>
+
+                                        {family.notes && (
+                                            <div className="mt-4">
+                                                {renderNotesField('Family Notes', family.notes)}
+                                            </div>
+                                        )}
+                                        <div className="mt-6">
+                                            <h4 className="text-sm font-medium text-muted-foreground mb-3">Current Needs</h4>
+                                            {renderNeeds(family.needs, family.id, entry.id)}
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            ))}
+                        </CardContent>
+                    </Card>
+                )}
 
                         {/* Martyrs */}
                         {entry.martyrs && entry.martyrs.filter(m => m.name).length > 0 && (
@@ -721,81 +728,6 @@ export default function Show({ entry, allNeeds, stats }: Props) {
                                 </div>
                             </CardContent>
                         </Card>
-
-                        {/* Entry Needs Summary */}
-                        {allNeeds && allNeeds.length > 0 && (
-                            <Card>
-                                <CardHeader className="border-b">
-                                    <CardTitle className="text-lg font-semibold">All Needs ({allNeeds.length})</CardTitle>
-                                </CardHeader>
-                                <CardContent className="p-6">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-                                        {allNeeds.map(need => {
-                                            const [isUpdating, setIsUpdating] = useState(false);
-                                            const [currentStatus, setCurrentStatus] = useState(need.pivot?.status || 'pending');
-                                            const isGiven = currentStatus === 'given' || need.pivot?.is_fulfilled;
-
-                                            const handleNeedClick = async () => {
-                                                setIsUpdating(true);
-                                                const newStatus = currentStatus === 'given' ? 'pending' : 'given';
-
-                                                try {
-                                                    router.patch(
-                                                        route('entries.update-need-status', {
-                                                            entry: entry.id,
-                                                            family: 0,
-                                                            need: need.id
-                                                        }),
-                                                        {
-                                                            status: newStatus
-                                                        },
-                                                        {
-                                                            preserveScroll: true,
-                                                            preserveState: false,
-                                                            onSuccess: () => {
-                                                                setCurrentStatus(newStatus);
-                                                            },
-                                                            onFinish: () => {
-                                                                setIsUpdating(false);
-                                                            }
-                                                        }
-                                                    );
-                                                } catch (error) {
-                                                    console.error('Error:', error);
-                                                    setIsUpdating(false);
-                                                }
-                                            };
-
-                                            return (
-                                                <button
-                                                    key={need.id}
-                                                    onClick={handleNeedClick}
-                                                    disabled={isUpdating}
-                                                    className={`flex items-center gap-2 p-3 rounded-lg border cursor-pointer transition-all text-left ${
-                                                        isGiven
-                                                            ? 'bg-green-50 border-green-200 text-green-800 hover:bg-green-100'
-                                                            : 'bg-muted border-border text-foreground hover:bg-muted/50'
-                                                    } ${isUpdating ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                                >
-                                                    <div className={`w-3 h-3 rounded-full ${
-                                                        isGiven ? 'bg-green-500' : 'bg-gray-400'
-                                                    }`}></div>
-                                                    <span className="text-sm font-medium flex-1">{need.name_ar}</span>
-                                                    <div className="flex items-center gap-1">
-                                                        {isGiven && (
-                                                            <CheckCircle className="w-4 h-4 text-green-600" />
-                                                        )}
-                                                        {isUpdating && (
-                                                            <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-                                                        )}
-                                                    </div>
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        )}
                     </div>
                 </div>
             </div>
