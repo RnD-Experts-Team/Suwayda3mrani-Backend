@@ -48,6 +48,7 @@ class OtherNeedsSheetExport implements FromCollection, WithHeadings, WithMapping
             'رقم الدخول',        // Entry Number
             'اسم الزوجة',        // Wife Name (from DisplacedFamily)
             'معلومات الأطفال',    // Children Info (from DisplacedFamily)
+            'ملاحظات',          // Notes (from DisplacedFamily)
             'تاريخ الإنشاء',      // Created Date
         ];
     }
@@ -58,14 +59,14 @@ class OtherNeedsSheetExport implements FromCollection, WithHeadings, WithMapping
         $host = null;
         $entry = null;
 
-        if ($family->entry_id) {
+        if ($family->entry_id && $family->entry) {
             // Direct family under entry
             $entry = $family->entry;
-            $host = $entry->host;
-        } elseif ($family->shelter_id && $family->shelter->entry) {
+            $host = $entry->host ?? null;
+        } elseif ($family->shelter_id && $family->shelter && $family->shelter->entry) {
             // Family under shelter
             $entry = $family->shelter->entry;
-            $host = $entry->host;
+            $host = $entry->host ?? null;
         }
 
         // Get all "other" needs for this family
@@ -75,6 +76,7 @@ class OtherNeedsSheetExport implements FromCollection, WithHeadings, WithMapping
             })
             ->pluck('name_ar')
             ->implode('، '); // Arabic comma separator
+
         return [
             $otherNeeds ?: 'غير محدد',
             $host->full_name ?? 'غير محدد',
@@ -85,6 +87,7 @@ class OtherNeedsSheetExport implements FromCollection, WithHeadings, WithMapping
             $entry->entry_number ?? 'غير محدد',
             $family->wife_name ?? 'غير محدد',
             $this->formatText($family->children_info),
+            $this->formatText($family->notes),
             $family->created_at ? $family->created_at->format('Y-m-d H:i') : 'غير محدد',
         ];
     }
