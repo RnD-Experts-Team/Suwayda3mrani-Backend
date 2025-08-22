@@ -62,6 +62,7 @@ class NeedSheetExport implements FromCollection, WithHeadings, WithMapping, Shou
             'رقم الدخول',        // Entry Number
             'اسم الزوجة',        // Wife Name (from DisplacedFamily)
             'معلومات الأطفال',    // Children Info (from DisplacedFamily)
+            'ملاحظات',          // Notes (from DisplacedFamily)
             'تاريخ الإنشاء',      // Created Date
         ];
     }
@@ -74,14 +75,14 @@ class NeedSheetExport implements FromCollection, WithHeadings, WithMapping, Shou
         $host = null;
         $entry = null;
 
-        if ($family->entry_id) {
+        if ($family->entry_id && $family->entry) {
             // Direct family under entry
             $entry = $family->entry;
-            $host = $entry->host;
-        } elseif ($family->shelter_id && $family->shelter->entry) {
+            $host = $entry->host ?? null;
+        } elseif ($family->shelter_id && $family->shelter && $family->shelter->entry) {
             // Family under shelter
             $entry = $family->shelter->entry;
-            $host = $entry->host;
+            $host = $entry->host ?? null;
         }
 
         return [
@@ -94,6 +95,7 @@ class NeedSheetExport implements FromCollection, WithHeadings, WithMapping, Shou
             $entry->entry_number ?? 'غير محدد',
             $family->wife_name ?? 'غير محدد',
             $this->formatText($family->children_info),
+            $this->formatText($family->notes),
             $family->created_at ? $family->created_at->format('Y-m-d H:i') : 'غير محدد',
         ];
     }
