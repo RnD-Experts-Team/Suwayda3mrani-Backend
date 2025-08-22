@@ -20,7 +20,7 @@ class DisplacedFamiliesSheetExport implements FromCollection, WithHeadings, With
 
     public function collection()
     {
-        return DisplacedFamily::with(['shelter.entry', 'entry', 'needs'])
+        return DisplacedFamily::with(['shelter.entry.host', 'entry.host', 'needs'])
             ->orderBy('created_at', 'desc')
             ->get();
     }
@@ -32,6 +32,11 @@ class DisplacedFamiliesSheetExport implements FromCollection, WithHeadings, With
             'مرتبطة بـ',               // Associated With
             'رقم الدخول',             // Entry Number
             'مكان الملجأ',             // Shelter Location
+            'اسم المضيف',              // Host Name
+            'موقع المضيف',            // Host Location
+            'عنوان المضيف',           // Host Address
+            'هاتف المضيف',            // Host Phone
+            'عدد أفراد عائلة المضيف',   // Host Family Count
             'عدد أفراد العائلة',        // Individuals Count
             'جهة اتصال رب العائلة',     // Family Head Contact
             'اسم الزوجة',              // Wife Name
@@ -54,11 +59,24 @@ class DisplacedFamiliesSheetExport implements FromCollection, WithHeadings, With
 
     public function map($family): array
     {
+        // Get host information - check both shelter->entry->host and direct entry->host
+        $host = null;
+        if ($family->shelter && $family->shelter->entry && $family->shelter->entry->host) {
+            $host = $family->shelter->entry->host;
+        } elseif ($family->entry && $family->entry->host) {
+            $host = $family->entry->host;
+        }
+
         return [
             $family->id,
             $family->shelter_id ? 'ملجأ' : ($family->entry_id ? 'دخول مباشر' : 'غير محدد'),
             $family->shelter->entry->entry_number ?? ($family->entry->entry_number ?? 'غير محدد'),
             $family->shelter->place ?? 'غير محدد',
+            $host->full_name ?? 'غير محدد',
+            $host->location ?? 'غير محدد',
+            $host->address ?? 'غير محدد',
+            $host->phone ?? 'غير محدد',
+            $host->family_count ?? 'غير محدد',
             $family->individuals_count ?? 'غير محدد',
             $family->contact ?? 'غير محدد',
             $family->wife_name ?? 'غير محدد',
