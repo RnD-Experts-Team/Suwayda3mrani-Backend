@@ -12,7 +12,7 @@ class EntriesExport implements WithMultipleSheets
             'الدخولات' => new EntriesSheetExport(),           // Entries
             'المضيفين' => new HostsSheetExport(),             // Hosts
             'الشهداء' => new MartyrsSheetExport(),            // Martyrs
-            'الملاجئ' => new SheltersSheetExport(),           // Shelters
+            'مراكز الاستضافة' => new SheltersSheetExport(),           // Shelters
             'العائلات النازحة' => new DisplacedFamiliesSheetExport(), // Displaced Families
         ];
     }

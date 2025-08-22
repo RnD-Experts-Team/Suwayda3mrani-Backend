@@ -31,7 +31,7 @@ class DisplacedFamiliesSheetExport implements FromCollection, WithHeadings, With
             'رقم العائلة',             // Family ID
             'مرتبطة بـ',               // Associated With
             'رقم الدخول',             // Entry Number
-            'مكان الملجأ',             // Shelter Location
+            'مكان الاستضافة',             // Shelter Location
             'اسم المضيف',              // Host Name
             'موقع المضيف',            // Host Location
             'عنوان المضيف',           // Host Address
@@ -69,7 +69,7 @@ class DisplacedFamiliesSheetExport implements FromCollection, WithHeadings, With
 
         return [
             $family->id,
-            $family->shelter_id ? 'ملجأ' : ($family->entry_id ? 'دخول مباشر' : 'غير محدد'),
+            $family->shelter_id ? 'مركز استضافة' : ($family->entry_id ? 'عائلة مضيفة' : 'غير محدد'),
             $family->shelter->entry->entry_number ?? ($family->entry->entry_number ?? 'غير محدد'),
             $family->shelter->place ?? 'غير محدد',
             $host->full_name ?? 'غير محدد',

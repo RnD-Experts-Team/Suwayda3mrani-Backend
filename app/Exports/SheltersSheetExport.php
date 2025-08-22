@@ -15,7 +15,7 @@ class SheltersSheetExport implements FromCollection, WithHeadings, WithMapping, 
 {
     public function title(): string
     {
-        return 'الملاجئ';
+        return 'مراكز الاستضافة';
     }
 
     public function collection()
@@ -28,8 +28,8 @@ class SheltersSheetExport implements FromCollection, WithHeadings, WithMapping, 
         return [
             'رقم الدخول الفريد',        // Entry ID
             'رقم الدخول',             // Entry Number
-            'مكان الملجأ',             // Shelter Place
-            'جهة اتصال الملجأ',        // Shelter Contact
+            'مكان مركز الاستضافة',             // Shelter Place
+            'جهة اتصال مركز الاستضافة',        // Shelter Contact
             'عدد العائلات النازحة',      // Number of Displaced Families
             'تاريخ الإنشاء',           // Created At
         ];
